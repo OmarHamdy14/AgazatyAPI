@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
@@ -27,10 +28,12 @@ namespace Agazaty.Models
         public double NormalLeavesCount { get; set; }
         [Range(0, double.MaxValue)]
         public double CasualLeavesCount { get; set; }
+        public double PermitLeavesCount { get; set; }
+        [DefaultValue(true)]
+        public bool IntializationCheck { get; set; }
         [Required]
         [ForeignKey("Department")]
         public int? Departement_ID { get; set; }
         public Department? Department { get; set; }
-        //public double PermitLeavesCount { get; set; }
     }
 }

@@ -21,7 +21,7 @@ namespace Agazaty.Controllers
             _base = Ebase;
         }
         [Authorize]
-        [HttpGet("GetSickLeaveById/{id:int}")]
+        [HttpGet("GetSickLeaveById/{leaveID:int}")]
         public IActionResult GetSickLeaveById(int leaveID)
         {
             if (leaveID <= 0)
@@ -183,7 +183,7 @@ namespace Agazaty.Controllers
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
-        [HttpPut("UpdateSickLeave/{LeaveId}")]
+        [HttpPut("UpdateSickLeave/{leaveID}")]
         public IActionResult UpdateSickLeave(int leaveID, [FromBody]UpdateSickLeaveDTO model)
         {
 
@@ -219,7 +219,7 @@ namespace Agazaty.Controllers
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
-        [HttpDelete("DeleteSickLeave/{LeaveId}")]
+        [HttpDelete("DeleteSickLeave/{leaveID}")]
         public IActionResult DeleteSickLeave(int leaveID)
         {
             if (leaveID <= 0)

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Data;
+using System.Net;
 
 namespace Agazaty.Controllers
 {
@@ -27,7 +28,7 @@ namespace Agazaty.Controllers
         [HttpGet("GetCasualLeaveById/{leaveID:int}", Name = "GetCasualLeave")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<CasualLeave> GetCasualLeaveById(int leaveID)
+        public async Task<ActionResult<CasualLeave>> GetCasualLeaveById(int leaveID)
         {
             if (leaveID <= 0)
                 return BadRequest(new { message = "Invalid leave ID." });
@@ -49,7 +50,7 @@ namespace Agazaty.Controllers
         [HttpGet("GetAllCasualLeaves", Name = "GetAllCasualLeaves")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<IEnumerable<CasualLeave>> GetAllCasualLeaves()
+        public async Task<ActionResult<IEnumerable<CasualLeave>>> GetAllCasualLeaves()
         {
             try
             {
@@ -69,7 +70,7 @@ namespace Agazaty.Controllers
         [HttpGet("GetAllCasualLeavesByUserID/{userID}", Name = "GetAllCasualLeavesByUserID")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<IEnumerable<CasualLeave>> GetAllCasualLeavesByUserID(string userID)
+        public async Task<ActionResult<IEnumerable<CasualLeave>>> GetAllCasualLeavesByUserID(string userID)
         {
             if (string.IsNullOrWhiteSpace(userID))
                 return BadRequest(new { message = "Invalid user ID." });
@@ -91,7 +92,7 @@ namespace Agazaty.Controllers
         [HttpGet("GetAllCasualLeavesByUserIDAndYear/{userID}/{year:int}", Name = "GetAllCasualLeavesByUserIDAndYear")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<IEnumerable<CasualLeave>> GetAllCasualLeavesByUserIDAndYear(string userID, int year)
+        public async Task<ActionResult<IEnumerable<CasualLeave>>> GetAllCasualLeavesByUserIDAndYear(string userID, int year)
         {
             try
             {
@@ -112,7 +113,7 @@ namespace Agazaty.Controllers
         [HttpPost("CreateCasualLeave", Name = "CreateCasualLeave")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<CasualLeave> CreateCasualLeave([FromBody] CreateCasualLeaveDTO model)
+        public async Task<ActionResult<CasualLeave>> CreateCasualLeave([FromBody] CreateCasualLeaveDTO model)
         {
             try
             {
@@ -120,15 +121,28 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(ModelState);
                 }
-                ApplicationUser user = _accountService.FindById(model.UserId);
+                ApplicationUser user = await  _accountService.FindById(model.UserId);
                 if((model.EndDate-model.StartDate).TotalDays > user.CasualLeavesCount)
                 {
-                    return Ok(new {Message = $"The number of days available to you are {user.CasualLeavesCount}" });
+                    return Ok(new {Message = $"Request can't be done , The number of days available to you are {user.CasualLeavesCount}" });
+                }
+                if (model == null)
+                {
+                    return BadRequest();
+                }
+                if (model.EndDate >= DateTime.Today || model.StartDate >= DateTime.Today)
+                {
+                    return BadRequest(new { Message = "The leave period should be in the past." });
+                }
+                if((model.EndDate - model.StartDate).TotalDays > 1)
+                {
+                    return BadRequest(new { Message = "You have exceeded the allowed number of days " });
+                }
+                if ((model.EndDate - model.StartDate).TotalDays < 0)
+                {
+                    return BadRequest(new {Message= "StartDate should be less than EndDate " });
                 }
 
-                DateTime today = DateTime.Today;
-                if (model.EndDate >= today)
-                    return BadRequest(new { Message = "The leave period should be in the past." });
 
                 var casualLeave = _mapper.Map<CasualLeave>(model);
                 user.CasualLeavesCount -= (casualLeave.EndDate - casualLeave.StartDate).TotalDays;
@@ -145,7 +159,7 @@ namespace Agazaty.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult UpdateCasualLeave(int leaveID, [FromBody] UpdateCasualLeaveDTO model)
+        public async Task<IActionResult> UpdateCasualLeave(int leaveID, [FromBody] UpdateCasualLeaveDTO model)
         {
             if (leaveID <= 0)
             {
@@ -162,7 +176,7 @@ namespace Agazaty.Controllers
                 {
                     return NotFound();
                 }
-                ApplicationUser user = _accountService.FindById(model.UserId);
+                ApplicationUser user = await  _accountService.FindById(model.UserId);
                 if ((model.EndDate - model.StartDate).TotalDays > user.CasualLeavesCount)
                 {
                     return Ok(new { Message = $"The number of days available to you are {user.CasualLeavesCount}" });
@@ -185,7 +199,7 @@ namespace Agazaty.Controllers
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult DeleteCasualLeave(int leaveID)
+        public async Task<IActionResult> DeleteCasualLeave(int leaveID)
         {
             try
             {

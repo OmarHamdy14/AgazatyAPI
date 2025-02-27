@@ -9,6 +9,5 @@ namespace Agazaty.Models
         public DateTime CreateDate { get; set; }
         [Required]
         public string ManagerNationalNumber { get; set; }
-        public ICollection<ApplicationUser>? users { get; set; }
     }
 }

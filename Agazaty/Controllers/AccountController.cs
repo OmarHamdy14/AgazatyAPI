@@ -27,15 +27,18 @@ namespace Agazaty.Controllers
             _deptBase = deptBase;
         }
         [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
-        [HttpGet("GetUserById/{UserId}")]
-        public async Task<IActionResult> GetUserById(string userID)
+        [HttpGet("GetUserById/{userID}")]
+        public async Task<IActionResult> GetUserById([FromRoute]string userID)
         {
             if (string.IsNullOrWhiteSpace(userID))
                 return BadRequest(new { message = "Invalid user ID." });
             try
             {
-                var user = _accountService.FindById(userID);
-                if (user == null) return NotFound(new { Message = "User is not found" });
+                var user = await _accountService.FindById(userID);
+                if (user == null)
+                {
+                    return NotFound(new { Message = "User is not found" });
+                }
                 return Ok(user);
             }
             catch (Exception ex)
@@ -90,34 +93,6 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
-        [HttpGet("InitalizeLeavesCountOfUser/{userid}")]
-        public async Task<IActionResult> InitalizeLeavesCountOfUser(string userid)
-        {
-            try
-            {
-                var user = _accountService.FindById(userid);
-               DateTime HireDate = DateTime.Parse(user.HireDate);
-               DateTime DateOfBirth = DateTime.Parse(user.DateOfBirth);
-                if ((HireDate - DateTime.UtcNow.Date).TotalDays >= 30 * 6)
-                {
-                    user.NormalLeavesCount = 15;
-                    user.CasualLeavesCount = 7; 
-                }
-                else if (DateTime.UtcNow.Month==7 && DateTime.UtcNow.Day == 1)
-                {
-                    user.CasualLeavesCount = 7;
-                    if ((HireDate - DateTime.UtcNow.Date).TotalDays >= 30 * 12) user.NormalLeavesCount = 28;
-                    if ((HireDate - DateTime.UtcNow.Date).TotalDays >= 365 * 10) user.NormalLeavesCount = 37;
-                    if ((DateOfBirth - DateTime.UtcNow.Date).TotalDays >= 365 * 50) user.NormalLeavesCount = 52;
-                }
-                return Ok();
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
-            }
-        }
         [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("RegsitrationPageNeededData")]
         public async  Task<IActionResult> CreateUserRequest()
@@ -158,7 +133,7 @@ namespace Agazaty.Controllers
 
 
                         await _accountService.AddUserToRole(user, RoleName);
-                        await InitalizeLeavesCountOfUser(user.Id);
+                        //await InitalizeLeavesCountOfUser(user.Id);
                         await _signInManager.SignInAsync(user, false);
                         return Ok(res);
                     }
@@ -192,7 +167,15 @@ namespace Agazaty.Controllers
                         Response.Cookies.Append("UserName", applicationUser.UserName, cookieOptions);
                         Response.Cookies.Append("UserId", applicationUser.Id, cookieOptions);
 
-                        await InitalizeLeavesCountOfUser(applicationUser.Id);
+                        if (DateTime.UtcNow.Month == 7 && applicationUser.IntializationCheck)
+                        {
+                            await _accountService.InitalizeLeavesCountOfUser(applicationUser.Id);
+                            applicationUser.IntializationCheck = false;
+                        }
+                        else if(DateTime.UtcNow.Month != 7)
+                        {
+                            applicationUser.IntializationCheck = true;
+                        }
                         await _signInManager.SignInAsync(applicationUser, false);
                         return Ok(res);
                     }
@@ -228,7 +211,7 @@ namespace Agazaty.Controllers
                 return BadRequest(new { message = "Invalid UserID or RoleName." });
             try
             {
-                var user = _accountService.FindById(UserId);
+                var user = await _accountService.FindById(UserId);
                 var res = await _accountService.AddUserToRole(user, RoleName);
                 return Ok(new { Message = res });
             }
@@ -238,7 +221,7 @@ namespace Agazaty.Controllers
             }
         }
         [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
-        [HttpPut("UpdateUser/{UserId}/{RoleName}")]
+        [HttpPut("UpdateUser/{userid}/{RoleName}")]
         public async Task<IActionResult> UdpateUser(string userid, string RoleName, [FromBody]UpdateUserDTO model)
         {
             if (string.IsNullOrWhiteSpace(userid))
@@ -247,7 +230,7 @@ namespace Agazaty.Controllers
             {
                 if (ModelState.IsValid)
                 {
-                    var user = _accountService.FindById(userid);
+                    var user = await _accountService.FindById(userid);
                     if (user == null) return NotFound(new { Message = "User is not found" });
 
 
@@ -290,7 +273,7 @@ namespace Agazaty.Controllers
                 return BadRequest(new { message = "Invalid user ID." });
             try
             {
-                var user = _accountService.FindById(userid);
+                var user = await _accountService.FindById(userid);
                 if (user != null)
                 {
                     var res = await _accountService.Delete(user);

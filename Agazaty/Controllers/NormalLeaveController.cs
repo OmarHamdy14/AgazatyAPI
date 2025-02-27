@@ -75,7 +75,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+       [Authorize]
         [HttpGet("AcceptedByUserId/{userID}")]
         public IActionResult GetAllAcceptedNormalLeavesByUserID(string userID)
         {
@@ -99,7 +99,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+         [Authorize]
         [HttpGet("AcceptedByUserIdAndYear/{userID}/{year:int}")]
         public IActionResult GetAllAcceptedNormalLeavesByUserIDAndYear(string userID, int year)
         {
@@ -234,7 +234,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+         [Authorize]
         [HttpGet("WaitingByCoWorkerID/{coworkerID}")]
         public IActionResult GetAllWaitingNormalLeavesByCoWorkerID(string coworkerID)
         {
@@ -280,8 +280,12 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(ModelState);
                 }
-
-                var user = _accountService.FindById(model.UserID);
+                var cowrker = await _accountService.FindById(model.Coworker_ID); 
+                var user = await _accountService.FindById(model.UserID);
+                if(user==null || cowrker == null)
+                {
+                    return BadRequest(new { Message = "Invalid user id or coworker id." });
+                }
                 if ((model.EndDate - model.StartDate).TotalDays > user.CasualLeavesCount)
                 {
                     return Ok(new { Message = $"The number of days available to you are {user.NormalLeavesCount}" });
@@ -334,7 +338,7 @@ namespace Agazaty.Controllers
 
                     var dept = _departmentBase.Get(d => d.Id == user.Departement_ID);
                     var DepartmentHead = _accountService.FindByNationalId(dept.ManagerNationalNumber);
-                    normalLeave.Direct_ManagerID = _accountService.FindByNationalId(dept.ManagerNationalNumber).Id;
+                    normalLeave.Direct_ManagerID = DepartmentHead.Id;
                 }
                 else if(await _accountService.IsInRoleAsync(user, "Employee"))
                 {
@@ -344,7 +348,7 @@ namespace Agazaty.Controllers
 
                     var dept = _departmentBase.Get(d => d.Id == user.Departement_ID);
                     var DepartmentHead = _accountService.FindByNationalId(dept.ManagerNationalNumber);
-                    normalLeave.Direct_ManagerID = _accountService.FindByNationalId(dept.ManagerNationalNumber).Id;
+                    normalLeave.Direct_ManagerID = DepartmentHead.Id;
                 }
                 else if(await _accountService.IsInRoleAsync(user, "Supervisor"))
                 {
@@ -372,7 +376,7 @@ namespace Agazaty.Controllers
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPut("UpdateNormalLeave/{leaveID:int}")]
-        public IActionResult UpdateNormalLeave(int leaveID, [FromBody] UpdateNormalLeaveDTO model)
+        public async Task<IActionResult> UpdateNormalLeave(int leaveID, [FromBody] UpdateNormalLeaveDTO model)
         {
             try
             {
@@ -407,7 +411,7 @@ namespace Agazaty.Controllers
                 if (errors.Any())
                     return BadRequest(new { messages = errors });
                 // Update properties
-                ApplicationUser user = _accountService.FindById(NormalLeave.UserID);
+                ApplicationUser user = await _accountService.FindById(NormalLeave.UserID);
                 if ((model.EndDate - NormalLeave.StartDate).TotalDays > user.CasualLeavesCount)
                 {
                     return Ok(new { Message = $"The number of days available to you are {user.NormalLeavesCount}" });
@@ -438,7 +442,7 @@ namespace Agazaty.Controllers
         }
         [Authorize(Roles = "عميد الكلية,أمين الكلية")]
         [HttpPut("UpdateGeneralManagerDecision/{leaveID:int}")]
-        public IActionResult UpdateGeneralManagerDecision(int leaveID, [FromBody] GeneralManagerDecisionDTO model)
+        public async Task<IActionResult> UpdateGeneralManagerDecision(int leaveID, [FromBody] GeneralManagerDecisionDTO model)
         {
             try
             {
@@ -461,7 +465,7 @@ namespace Agazaty.Controllers
                 {
                     return NotFound(new { message = "Normal Leave not found or not eligible for update" });
                 }
-                ApplicationUser user = _accountService.FindById(NormalLeave.UserID);
+                ApplicationUser user = await _accountService.FindById(NormalLeave.UserID);
                 // Update properties
                 NormalLeave.GeneralManager_Decision = model.GeneralManagerDecision;
                 NormalLeave.ResponseDone = true;
@@ -549,7 +553,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
             }    
         }
-        [Authorize]
+       [Authorize]
         [HttpPut("UpdateCoworkerDecision/{leaveID:int}")]
         public async Task<IActionResult> UpdateCoworkerDecision([FromRoute]int leaveID, [FromQuery]bool CoworkerDecision)
         {
@@ -580,7 +584,7 @@ namespace Agazaty.Controllers
 
                     // if Head of Departement made a leave request
                     // if أمين الكلية made a leave request
-                    var user = _accountService.FindById(NormalLeave.UserID);
+                    var user = await _accountService.FindById(NormalLeave.UserID);
                     var dept = _departmentBase.Get(d => d.ManagerNationalNumber == user.NationalID);
                     bool cheackRole = await _accountService.IsInRoleAsync(user, "أمين الكلية");
                     if (cheackRole || dept != null)
@@ -604,7 +608,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+       [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpDelete("DeleteNormalLeave/{leaveID}")]
         public IActionResult DeleteNormalLeave([FromRoute]int leaveID)
         {

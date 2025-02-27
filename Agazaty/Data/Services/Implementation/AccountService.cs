@@ -4,6 +4,7 @@ using Agazaty.Models;
 using AutoMapper;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
@@ -29,9 +30,10 @@ namespace Agazaty.Data.Services.Implementation
             _jwt = jwt.Value;
             _roleManager = roleManager;
         }
-        public ApplicationUser FindById(string UserId)
+        public async Task<ApplicationUser> FindById(string UserId)
         {
-            return _appDbContext.Users.FirstOrDefault(u => u.Id == UserId);
+            return await _userManager.FindByIdAsync(UserId);
+            //return _appDbContext.Users.FirstOrDefault(u => u.Id == UserId);
         }
         public ApplicationUser FindByNationalId(string NationalId)
         {
@@ -61,6 +63,28 @@ namespace Agazaty.Data.Services.Implementation
         {
             var res = await _userManager.GetUsersInRoleAsync(RoleName);
             return res.FirstOrDefault().Id;
+        }
+        public async Task InitalizeLeavesCountOfUser(string userid)
+        {
+            var user = await FindById(userid);
+            DateTime HireDate = DateTime.Parse(user.HireDate);
+            DateTime DateOfBirth = DateTime.Parse(user.DateOfBirth);
+                //if (creationProcess)
+                //{
+                //    user.CasualLeavesCount = 7;
+                //    if ((HireDate - DateTime.UtcNow.Date).TotalDays >= 30 * 6) user.NormalLeavesCount = 15;
+                //    if ((HireDate - DateTime.UtcNow.Date).TotalDays >= 30 * 12) user.NormalLeavesCount = 28;
+                //    if ((HireDate - DateTime.UtcNow.Date).TotalDays >= 365 * 10) user.NormalLeavesCount = 37;
+                //    if ((DateOfBirth - DateTime.UtcNow.Date).TotalDays >= 365 * 50) user.NormalLeavesCount = 52;
+                //}
+          /// if (DateTime.UtcNow.Month == 7 && DateTime.UtcNow.Day == 1)
+           //{
+                user.CasualLeavesCount = 7;
+                if ((HireDate - DateTime.UtcNow.Date).TotalDays >= 30 * 6) user.NormalLeavesCount = 15;
+                if ((HireDate - DateTime.UtcNow.Date).TotalDays >= 28 * 12) user.NormalLeavesCount = 28;
+                if ((HireDate - DateTime.UtcNow.Date).TotalDays >= 364 * 10) user.NormalLeavesCount = 37;
+                if ((DateOfBirth - DateTime.UtcNow.Date).TotalDays >= 365 * 50) user.NormalLeavesCount = 52;
+           //}
         }
         public IEnumerable<ApplicationUser> GetAllUsersByDepartmentId(int DepartmentId)
         {
@@ -101,7 +125,8 @@ namespace Agazaty.Data.Services.Implementation
 
             var user = _mapper.Map<ApplicationUser>(model);
             user.Active = true;
-
+            //user.CasualLeavesCount = 7;
+            user.IntializationCheck = false;
 
             var result = await _userManager.CreateAsync(user, model.Password);
 

@@ -26,6 +26,11 @@ namespace Agazaty.Data.DTOs.AccountDTOs
         [Required]
         public string HireDate { get; set; }
         [Required]
+        [Range(0, double.MaxValue)]
+        public double NormalLeavesCount { get; set; }
+        [Range(0, double.MaxValue)]
+        public double CasualLeavesCount { get; set; }
+        [Required]
         public string NationalID { get; set; }
         [Required]
         public int Departement_ID { get; set; }

@@ -7,7 +7,7 @@ namespace Agazaty.Data.Services.Interfaces
 {
     public interface IAccountService
     {
-        ApplicationUser FindById(string id);
+        Task<ApplicationUser> FindById(string id);
         ApplicationUser FindByNationalId(string NationalId);
         Task<ApplicationUser> FindByName(string UserName);
         Task<ApplicationUser> FindByEmail(string email);
@@ -24,5 +24,6 @@ namespace Agazaty.Data.Services.Interfaces
         Task<AuthModel> GetTokenAsync(LogInUserDTO model);
         Task<IdentityResult> Update(ApplicationUser user);
         Task<IdentityResult> Delete(ApplicationUser user);
+        Task InitalizeLeavesCountOfUser(string userid);
     }
 }
