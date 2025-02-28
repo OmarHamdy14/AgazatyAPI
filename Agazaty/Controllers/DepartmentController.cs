@@ -144,7 +144,7 @@ namespace Agazaty.Controllers
         }
         [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpDelete("DeleteDepartment/{departmentID:int}")]
-        public IActionResult DeleteDepartment(int departmentID)
+        public async Task<IActionResult> DeleteDepartment(int departmentID)
         {
             if (departmentID <= 0)
             {
@@ -160,6 +160,8 @@ namespace Agazaty.Controllers
                     return NotFound($"No department found with ID {departmentID}.");
                 }
                 var entity = _baseDepartmentsManagers.Get(dm => dm.departmentId == department.Id);
+                var manager = await _accountService.FindById(entity.managerid);
+                manager.IsDepartmentManager = false;
                 _baseDepartmentsManagers.Remove(entity);
 
                 _base.Remove(department);

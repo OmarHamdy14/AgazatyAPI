@@ -275,6 +275,8 @@ namespace Agazaty.Controllers
                     if (user.IsDepartmentManager)
                     {
                         var entity = _baseDepartmentsManagers.Get(dm => dm.departmentId == user.Departement_ID);
+                        var oldmanager = await _accountService.FindById(entity.managerid);
+                        oldmanager.IsDepartmentManager = false;
                         entity.managerid = user.Id;
                         _baseDepartmentsManagers.Update(entity);
                     }
