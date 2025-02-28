@@ -70,7 +70,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, "An error occurred while retrieving the department.");
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpPost("CreateDepartment")]
         public IActionResult CreateDepartment([FromBody]CreateDepartmentDTO model)
         {
