@@ -131,6 +131,7 @@ namespace Agazaty.Data.Services.Implementation
             //user.CasualLeavesCount = 7;
             user.IntializationCheck = false;
 
+
             var result = await _userManager.CreateAsync(user, model.Password);
 
             if (!result.Succeeded)

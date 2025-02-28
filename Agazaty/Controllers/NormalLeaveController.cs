@@ -77,7 +77,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-       [Authorize]
+        [Authorize]
         [HttpGet("AcceptedByUserId/{userID}")]
         public IActionResult GetAllAcceptedNormalLeavesByUserID(string userID)
         {
@@ -101,7 +101,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-         [Authorize]
+        [Authorize]
         [HttpGet("AcceptedByUserIdAndYear/{userID}/{year:int}")]
         public IActionResult GetAllAcceptedNormalLeavesByUserIDAndYear(string userID, int year)
         {
@@ -236,7 +236,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-         [Authorize]
+        [Authorize]
         [HttpGet("WaitingByCoWorkerID/{coworkerID}")]
         public IActionResult GetAllWaitingNormalLeavesByCoWorkerID(string coworkerID)
         {
@@ -269,6 +269,13 @@ namespace Agazaty.Controllers
             return Ok(LeaveTypes.res);
         }
         [Authorize]
+        [HttpGet("NormalLeaveRequestNeededData")]
+        public IActionResult NormalLeaveRequestNeededData()
+        {
+            var coworkers = _accountService.GetAllUsers();
+            return Ok(coworkers);
+        }
+        [Authorize]
         [HttpPost("CreateNormalLeave")]
         public async Task<IActionResult> CreateNormalLeave([FromBody]CreateNormalLeaveDTO model)
         {
@@ -284,7 +291,7 @@ namespace Agazaty.Controllers
                 }
                 var cowrker = await _accountService.FindById(model.Coworker_ID); 
                 var user = await _accountService.FindById(model.UserID);
-                if(user==null || cowrker == null)
+                if(model.Coworker_ID==model.UserID || user ==null || cowrker == null)
                 {
                     return BadRequest(new { Message = "Invalid user id or coworker id." });
                 }
@@ -332,6 +339,10 @@ namespace Agazaty.Controllers
                     return BadRequest(new { messages = errors });
 
                 var normalLeave = _mapper.Map<NormalLeave>(model);
+                normalLeave.Year = model.RequestDate.Year;
+                normalLeave.LeaveStatus = LeaveStatus.Waiting;
+                normalLeave.Holder = Holder.CoWorker;
+                normalLeave.RejectedBy = RejectedBy.NotRejected;
                 if (await _accountService.IsInRoleAsync(user, "Staff"))
                 {
                     var res = await _accountService.GetAllUsersInRole("Dean");
@@ -557,7 +568,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
             }    
         }
-       [Authorize]
+        [Authorize]
         [HttpPut("UpdateCoworkerDecision/{leaveID:int}")]
         public async Task<IActionResult> UpdateCoworkerDecision([FromRoute]int leaveID, [FromQuery]bool CoworkerDecision)
         {
@@ -612,7 +623,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
             }
         }
-       [Authorize(Roles = "مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpDelete("DeleteNormalLeave/{leaveID}")]
         public IActionResult DeleteNormalLeave([FromRoute]int leaveID)
         {

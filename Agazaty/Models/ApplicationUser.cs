@@ -8,13 +8,17 @@ namespace Agazaty.Models
     public class ApplicationUser : IdentityUser
     {
         [Required]
-        public string FName { get; set; }
+        [RegularExpression(@"^[\p{L}]+$", ErrorMessage = "The First Namefield must contain only letters (English or Arabic), with no numbers or spaces.")]
+        public string FirstName { get; set; }
         [Required]
-        public string SName { get; set; }
+        [RegularExpression(@"^[\p{L}]+$", ErrorMessage = "The Second Name field must contain only letters (English or Arabic), with no numbers or spaces.")]
+        public string SecondName { get; set; }
         [Required]
-        public string TName { get; set; }
+        [RegularExpression(@"^[\p{L}]+$", ErrorMessage = "The Third Name field must contain only letters (English or Arabic), with no numbers or spaces.")]
+        public string ThirdName { get; set; }
         [Required]
-        public string LName { get; set; }
+        [RegularExpression(@"^[\p{L}]+$", ErrorMessage = "The Forth Name field must contain only letters (English or Arabic), with no numbers or spaces.")]
+        public string ForthName { get; set; }
         [Required]
         public DateTime DateOfBirth { get; set; }
         [Required]
@@ -26,6 +30,7 @@ namespace Agazaty.Models
         [Required]
         public DateTime HireDate { get; set; }
         [Required]
+        [RegularExpression(@"^\d{14}$", ErrorMessage = "The National Number field must contain exactly 14 digits with no spaces or other characters.")]
         public string NationalID { get; set; }
         public double SickLeavesCount { get; set; }
         [Range(0, double.MaxValue)]
@@ -35,11 +40,11 @@ namespace Agazaty.Models
         public double PermitLeavesCount { get; set; }
         [DefaultValue(true)]
         public bool IntializationCheck { get; set; }
-        [Required]
+        //[Required]
         [ForeignKey("Department")]
         public int? Departement_ID { get; set; }
         public Department? Department { get; set; }
-        [Required]
+        //[Required]
         public bool IsDepartmentManager { get; set; }
     }
 }

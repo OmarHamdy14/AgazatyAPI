@@ -5,23 +5,31 @@ namespace Agazaty.Data.DTOs.AccountDTOs
     public class CreateUserDTO
     {
         [Required]
-        public string FName { get; set; }
+        [RegularExpression(@"^[\p{L}]+$", ErrorMessage = "The First Name field must contain only letters (English or Arabic), with no numbers or spaces.")]
+        public string FirstName { get; set; }
         [Required]
-        public string SName { get; set; }
+        [RegularExpression(@"^[\p{L}]+$", ErrorMessage = "The Second Name field must contain only letters (English or Arabic), with no numbers or spaces.")]
+        public string SecondName { get; set; }
         [Required]
-        public string TName { get; set; }
+        [RegularExpression(@"^[\p{L}]+$", ErrorMessage = "The Third Name field must contain only letters (English or Arabic), with no numbers or spaces.")]
+        public string ThirdName { get; set; }
         [Required]
-        public string LName { get; set; }
+        [RegularExpression(@"^[\p{L}]+$", ErrorMessage = "The Forth Name field must contain only letters (English or Arabic), with no numbers or spaces.")]
+        public string ForthName { get; set; }
         [Required]
         public string UserName { get; set; }
         [Required]
-        [DataType(DataType.EmailAddress)]
+        [EmailAddress(ErrorMessage = "Invalid email format.")]
         public string Email { get; set; }
         [Required]
+        [RegularExpression(@"^\d{11}$", ErrorMessage = "The Phone Number field must contain exactly 11 digits with no spaces or other characters.")]
         public string PhoneNumber { get; set; }
         [Required]
         public string Gender { get; set; }
-        [Required]  
+        [Required]
+        [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$",
+         ErrorMessage = "Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number, and one special character.")]
+        [DataType(DataType.Password)]
         public string Password { get; set; }
         [Required]
         public DateTime DateOfBirth { get; set; }
@@ -35,9 +43,10 @@ namespace Agazaty.Data.DTOs.AccountDTOs
         [Range(0, double.MaxValue)]
         public double CasualLeavesCount { get; set; }
         [Required]
+        [RegularExpression(@"^\d{14}$", ErrorMessage = "The National Number field must contain exactly 14 digits with no spaces or other characters.")]
         public string NationalID { get; set; }
         public int? Departement_ID { get; set; }
-        [Required]
+        //[Required]
         public bool IsDepartmentManager { get; set; }
     }
 }

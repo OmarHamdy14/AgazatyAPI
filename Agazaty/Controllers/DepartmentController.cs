@@ -161,10 +161,13 @@ namespace Agazaty.Controllers
                     return NotFound($"No department found with ID {departmentID}.");
                 }
                 var entity = _baseDepartmentsManagers.Get(dm => dm.departmentId == department.Id);
-                var manager = await _accountService.FindById(entity.managerid);
-                manager.IsDepartmentManager = false;
-                await _accountService.Update(manager);
-                _baseDepartmentsManagers.Remove(entity);
+                if (entity != null)
+                {
+                    var manager = await _accountService.FindById(entity.managerid);
+                    manager.IsDepartmentManager = false;
+                    await _accountService.Update(manager);
+                    _baseDepartmentsManagers.Remove(entity);
+                }
 
                 _base.Remove(department);
 
