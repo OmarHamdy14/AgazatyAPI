@@ -6,6 +6,7 @@ using Agazaty.Models;
 using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Data;
 
@@ -162,6 +163,7 @@ namespace Agazaty.Controllers
                 var entity = _baseDepartmentsManagers.Get(dm => dm.departmentId == department.Id);
                 var manager = await _accountService.FindById(entity.managerid);
                 manager.IsDepartmentManager = false;
+                await _accountService.Update(manager);
                 _baseDepartmentsManagers.Remove(entity);
 
                 _base.Remove(department);
