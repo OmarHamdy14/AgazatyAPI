@@ -1,4 +1,5 @@
-﻿using Agazaty.Data.DTOs.AccountDTOs;
+﻿using Agazaty.Data.Base;
+using Agazaty.Data.DTOs.AccountDTOs;
 using Agazaty.Data.Services.Interfaces;
 using Agazaty.Models;
 using AutoMapper;
@@ -19,16 +20,18 @@ namespace Agazaty.Data.Services.Implementation
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly RoleManager<IdentityRole> _roleManager;
+        //private readonly IEntityBaseRepository<DepartmentsManagers> _baseDepartmentsManagers;
         private readonly AppDbContext _appDbContext;
         private readonly IMapper _mapper;
         private readonly JWT _jwt;
-        public AccountService(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, AppDbContext appDbContext, IMapper mapper, IOptions<JWT> jwt)
+        public AccountService(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, AppDbContext appDbContext, IMapper mapper, IOptions<JWT> jwt/*, IEntityBaseRepository<DepartmentsManagers> baseDepartmentsManagers*/)
         {
             _userManager = userManager;
             _appDbContext = appDbContext;
             _mapper = mapper;
             _jwt = jwt.Value;
             _roleManager = roleManager;
+            //_baseDepartmentsManagers = baseDepartmentsManagers;
         }
         public async Task<ApplicationUser> FindById(string UserId)
         {
@@ -67,8 +70,8 @@ namespace Agazaty.Data.Services.Implementation
         public async Task InitalizeLeavesCountOfUser(string userid)
         {
             var user = await FindById(userid);
-            DateTime HireDate = DateTime.Parse(user.HireDate);
-            DateTime DateOfBirth = DateTime.Parse(user.DateOfBirth);
+            //DateTime HireDate = DateTime.Parse(user.HireDate);
+            //DateTime DateOfBirth = DateTime.Parse(user.DateOfBirth);
                 //if (creationProcess)
                 //{
                 //    user.CasualLeavesCount = 7;
@@ -80,10 +83,10 @@ namespace Agazaty.Data.Services.Implementation
           /// if (DateTime.UtcNow.Month == 7 && DateTime.UtcNow.Day == 1)
            //{
                 user.CasualLeavesCount = 7;
-                if ((HireDate - DateTime.UtcNow.Date).TotalDays >= 30 * 6) user.NormalLeavesCount = 15;
-                if ((HireDate - DateTime.UtcNow.Date).TotalDays >= 28 * 12) user.NormalLeavesCount = 28;
-                if ((HireDate - DateTime.UtcNow.Date).TotalDays >= 364 * 10) user.NormalLeavesCount = 37;
-                if ((DateOfBirth - DateTime.UtcNow.Date).TotalDays >= 365 * 50) user.NormalLeavesCount = 52;
+                if ((user.HireDate - DateTime.UtcNow.Date).TotalDays >= 30 * 6) user.NormalLeavesCount = 15;
+                if ((user.HireDate - DateTime.UtcNow.Date).TotalDays >= 28 * 12) user.NormalLeavesCount = 28;
+                if ((user.HireDate - DateTime.UtcNow.Date).TotalDays >= 364 * 10) user.NormalLeavesCount = 37;
+                if ((user.DateOfBirth - DateTime.UtcNow.Date).TotalDays >= 365 * 50) user.NormalLeavesCount = 52;
            //}
         }
         public IEnumerable<ApplicationUser> GetAllUsersByDepartmentId(int DepartmentId)
@@ -141,6 +144,8 @@ namespace Agazaty.Data.Services.Implementation
             }
             var res = await _userManager.AddToRoleAsync(user,RoleName);
             var jwtSecurityToken = await CreateJwtToken(user);
+
+            
 
             return new AuthModel
             {

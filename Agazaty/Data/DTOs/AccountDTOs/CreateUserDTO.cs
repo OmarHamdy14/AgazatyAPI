@@ -4,9 +4,13 @@ namespace Agazaty.Data.DTOs.AccountDTOs
 {
     public class CreateUserDTO
     {
+        [Required]
         public string FName { get; set; }
+        [Required]
         public string SName { get; set; }
+        [Required]
         public string TName { get; set; }
+        [Required]
         public string LName { get; set; }
         [Required]
         public string UserName { get; set; }
@@ -20,11 +24,11 @@ namespace Agazaty.Data.DTOs.AccountDTOs
         [Required]  
         public string Password { get; set; }
         [Required]
-        public string DateOfBirth { get; set; }
+        public DateTime DateOfBirth { get; set; }
         [Required]
         public int Position { get; set; }
         [Required]
-        public string HireDate { get; set; }
+        public DateTime HireDate { get; set; }
         [Required]
         [Range(0, double.MaxValue)]
         public double NormalLeavesCount { get; set; }
@@ -32,7 +36,8 @@ namespace Agazaty.Data.DTOs.AccountDTOs
         public double CasualLeavesCount { get; set; }
         [Required]
         public string NationalID { get; set; }
+        public int? Departement_ID { get; set; }
         [Required]
-        public int Departement_ID { get; set; }
+        public bool IsDepartmentManager { get; set; }
     }
 }

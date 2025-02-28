@@ -19,16 +19,18 @@ namespace Agazaty.Controllers
     {
         private readonly IEntityBaseRepository<NormalLeave> _base;
         private readonly IAccountService _accountService;
-        private readonly IEntityBaseRepository<Department> _departmentBase;  
+        private readonly IEntityBaseRepository<Department> _departmentBase;
+        private readonly IEntityBaseRepository<DepartmentsManagers> _baseDepartmentsManagers;
         private readonly IMapper _mapper;
         private readonly AppDbContext _appDbContext;
-        public NormalLeaveController(AppDbContext appDbContext, IEntityBaseRepository<NormalLeave> Ebase, IAccountService accountService, IMapper mapper, IEntityBaseRepository<Department> departmentBase)
+        public NormalLeaveController(AppDbContext appDbContext, IEntityBaseRepository<NormalLeave> Ebase, IAccountService accountService, IMapper mapper, IEntityBaseRepository<Department> departmentBase, IEntityBaseRepository<DepartmentsManagers> baseDepartmentsManagers)
         {
             _base = Ebase;
             _accountService = accountService;
             _mapper = mapper;   
             _appDbContext = appDbContext;
             _departmentBase = departmentBase;
+            _baseDepartmentsManagers = baseDepartmentsManagers;
         }
         [Authorize]
         [HttpGet("GetNormalLeaveById/{leaveID:int}")]
@@ -336,9 +338,10 @@ namespace Agazaty.Controllers
                     var Dean = res.FirstOrDefault();
                     normalLeave.General_ManagerID = Dean.Id;
 
-                    var dept = _departmentBase.Get(d => d.Id == user.Departement_ID);
-                    var DepartmentHead = _accountService.FindByNationalId(dept.ManagerNationalNumber);
-                    normalLeave.Direct_ManagerID = DepartmentHead.Id;
+                    //var dept = _departmentBase.Get(d => d.Id == user.Departement_ID);
+                    //var DepartmentHead = _accountService.FindByNationalId(dept.ManagerNationalNumber);
+                    var DepartmentHeadID = _baseDepartmentsManagers.Get(dm => dm.departmentId == user.Departement_ID).managerid;
+                    normalLeave.Direct_ManagerID = DepartmentHeadID;
                 }
                 else if(await _accountService.IsInRoleAsync(user, "Employee"))
                 {
@@ -346,9 +349,10 @@ namespace Agazaty.Controllers
                     var Dean = res.FirstOrDefault();
                     normalLeave.General_ManagerID = res.FirstOrDefault().Id;
 
-                    var dept = _departmentBase.Get(d => d.Id == user.Departement_ID);
-                    var DepartmentHead = _accountService.FindByNationalId(dept.ManagerNationalNumber);
-                    normalLeave.Direct_ManagerID = DepartmentHead.Id;
+                    //var dept = _departmentBase.Get(d => d.Id == user.Departement_ID);
+                    //var DepartmentHead = _accountService.FindByNationalId(dept.ManagerNationalNumber);
+                    var DepartmentHeadID = _baseDepartmentsManagers.Get(dm => dm.departmentId == user.Departement_ID).managerid;
+                    normalLeave.Direct_ManagerID = DepartmentHeadID;
                 }
                 else if(await _accountService.IsInRoleAsync(user, "Supervisor"))
                 {
@@ -585,9 +589,9 @@ namespace Agazaty.Controllers
                     // if Head of Departement made a leave request
                     // if أمين الكلية made a leave request
                     var user = await _accountService.FindById(NormalLeave.UserID);
-                    var dept = _departmentBase.Get(d => d.ManagerNationalNumber == user.NationalID);
+                    var IsdeptManager = _baseDepartmentsManagers.Get(d => d.managerid == user.Id);
                     bool cheackRole = await _accountService.IsInRoleAsync(user, "أمين الكلية");
-                    if (cheackRole || dept != null)
+                    if (cheackRole || IsdeptManager != null)
                         NormalLeave.DirectManager_Decision = true;
                 }
 

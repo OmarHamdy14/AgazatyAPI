@@ -18,13 +18,16 @@ namespace Agazaty.Controllers
         private readonly IAccountService _accountService;
         private readonly IRoleService _roleService;
         private readonly SignInManager<ApplicationUser> _signInManager;
-        IEntityBaseRepository<Department> _deptBase;
-        public AccountController(IAccountService accountService, SignInManager<ApplicationUser> signInManager, IRoleService roleService, IEntityBaseRepository<Department> deptBase)
+        private readonly IEntityBaseRepository<Department> _deptBase;
+        private readonly IEntityBaseRepository<DepartmentsManagers> _baseDepartmentsManagers;
+
+        public AccountController(IAccountService accountService, SignInManager<ApplicationUser> signInManager, IRoleService roleService, IEntityBaseRepository<Department> deptBase, IEntityBaseRepository<DepartmentsManagers> baseDepartmentsManagers)
         {
             _accountService = accountService;
             _signInManager = signInManager;
             _roleService = roleService;
             _deptBase = deptBase;
+            _baseDepartmentsManagers = baseDepartmentsManagers;
         }
         [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetUserById/{userID}")]
@@ -122,12 +125,29 @@ namespace Agazaty.Controllers
                     var res = await _accountService.Create(RoleName,model);
                     if (res.IsAuthenticated)
                     {
+                        ApplicationUser user = _accountService.FindByNationalId(model.NationalID);
+
+                        // CheckFor : if this user is a manager of his department
+                        if (user.IsDepartmentManager)
+                        {
+                            var isExisted = _baseDepartmentsManagers.Get(dm => dm.departmentId == user.Departement_ID);
+                            if (isExisted != null)
+                            {
+                                return Ok(new AuthModel { Message = "This department is already has a manager" });
+                            }
+                            DepartmentsManagers DepartmentsManagers = new DepartmentsManagers()
+                            {
+                                managerid = user.Id,
+                                departmentId = (int)user.Departement_ID
+                            };
+                            _baseDepartmentsManagers.Add(DepartmentsManagers);
+                        }
+
                         var cookieOptions = new CookieOptions()
                         {
                             HttpOnly = true,
                             Expires = DateTime.Now.AddDays(1)
                         };
-                        ApplicationUser user = _accountService.FindByNationalId(model.NationalID);
                         Response.Cookies.Append("UserName", user.UserName, cookieOptions);
                         Response.Cookies.Append("UserId", user.Id, cookieOptions);
 
@@ -167,6 +187,7 @@ namespace Agazaty.Controllers
                         Response.Cookies.Append("UserName", applicationUser.UserName, cookieOptions);
                         Response.Cookies.Append("UserId", applicationUser.Id, cookieOptions);
 
+                        // Handling leavesCounts
                         if (DateTime.UtcNow.Month == 7 && applicationUser.IntializationCheck)
                         {
                             await _accountService.InitalizeLeavesCountOfUser(applicationUser.Id);
@@ -176,6 +197,7 @@ namespace Agazaty.Controllers
                         {
                             applicationUser.IntializationCheck = true;
                         }
+
                         await _signInManager.SignInAsync(applicationUser, false);
                         return Ok(res);
                     }
@@ -235,15 +257,27 @@ namespace Agazaty.Controllers
 
 
                     //var res = await _accountService.Update(userid, model);
+                    user.FName = model.FName;
+                    user.SName = model.SName;
+                    user.TName = model.TName;
+                    user.LName = model.LName;
                     user.UserName = model.UserName;
                     user.NationalID = model.NationalID;
                     user.HireDate = model.HireDate;
                     user.Active = true;
                     user.Email = model.Email;
                     user.PhoneNumber = model.PhoneNumber;
-                    user.PasswordHash = model.Password;
+                    //user.PasswordHash = model.Password;
                     user.Position = model.Position;
                     user.DateOfBirth = model.DateOfBirth;
+                    user.Departement_ID = model.Departement_ID;
+
+                    if (user.IsDepartmentManager)
+                    {
+                        var entity = _baseDepartmentsManagers.Get(dm => dm.departmentId == user.Departement_ID);
+                        entity.managerid = user.Id;
+                        _baseDepartmentsManagers.Update(entity);
+                    }
                     var res = await _accountService.Update(user);
                     if (res.Succeeded)
                     {
@@ -276,6 +310,8 @@ namespace Agazaty.Controllers
                 var user = await _accountService.FindById(userid);
                 if (user != null)
                 {
+                    var entity = _baseDepartmentsManagers.Get(dm => dm.managerid == user.Id);
+                    _baseDepartmentsManagers.Remove(entity);
                     var res = await _accountService.Delete(user);
                     if (res.Succeeded)
                     {

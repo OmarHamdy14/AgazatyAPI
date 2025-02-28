@@ -18,11 +18,13 @@ namespace Agazaty.Controllers
         private readonly IEntityBaseRepository<Department> _base;
         private readonly IAccountService _accountService;
         private readonly IMapper _mapper;
-        public DepartmentController(IMapper mapper, IEntityBaseRepository<Department> Ebase, IAccountService accountService)
+        private readonly IEntityBaseRepository<DepartmentsManagers> _baseDepartmentsManagers;
+        public DepartmentController(IMapper mapper, IEntityBaseRepository<Department> Ebase, IAccountService accountService, IEntityBaseRepository<DepartmentsManagers> baseDepartmentsManagers)
         {
             _mapper = mapper;
             _base = Ebase;
             _accountService = accountService;
+            _baseDepartmentsManagers = baseDepartmentsManagers;
         }
         [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetAllDepartments")]
@@ -83,11 +85,11 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(ModelState);
                 }
-                var res = _accountService.FindByNationalId(model.ManagerNationalNumber);
-                if (res == null)
-                {
-                    return NotFound(new { Message = "Manager National Number is not found" });
-                }
+                //var res = _accountService.FindByNationalId(model.ManagerNationalNumber);
+                //if (res == null)
+                //{
+                //    return NotFound(new { Message = "Manager National Number is not found" });
+                //}
                 var department = _mapper.Map<Department>(model);
 
                 _base.Add(department);
@@ -114,11 +116,11 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(ModelState);
                 }
-                var res = _accountService.FindByNationalId(model.ManagerNationalNumber);
-                if (res == null)
-                {
-                    return NotFound(new { Message = "Manager National Number is not found" });
-                }
+                //var res = _accountService.FindByNationalId(model.ManagerNationalNumber);
+                //if (res == null)
+                //{
+                //    return NotFound(new { Message = "Manager National Number is not found" });
+                //}
 
                 var department = _base.Get(d => d.Id == departmentID);
 
@@ -129,7 +131,7 @@ namespace Agazaty.Controllers
 
                 //department = _mapper.Map<Department>(model);
                 department.Name = model.Name;
-                department.ManagerNationalNumber = model.ManagerNationalNumber;
+                //department.ManagerNationalNumber = model.ManagerNationalNumber;
 
                 _base.Update(department);
 
@@ -157,6 +159,8 @@ namespace Agazaty.Controllers
                 {
                     return NotFound($"No department found with ID {departmentID}.");
                 }
+                var entity = _baseDepartmentsManagers.Get(dm => dm.departmentId == department.Id);
+                _baseDepartmentsManagers.Remove(entity);
 
                 _base.Remove(department);
 

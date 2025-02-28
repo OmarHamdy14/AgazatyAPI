@@ -7,12 +7,16 @@ namespace Agazaty.Models
 {
     public class ApplicationUser : IdentityUser
     {
+        [Required]
         public string FName { get; set; }
+        [Required]
         public string SName { get; set; }
+        [Required]
         public string TName { get; set; }
+        [Required]
         public string LName { get; set; }
         [Required]
-        public string DateOfBirth { get; set; }
+        public DateTime DateOfBirth { get; set; }
         [Required]
         public int Position { get; set; }
         [Required]
@@ -20,7 +24,7 @@ namespace Agazaty.Models
         [Required]
         public string Gender { get; set; }
         [Required]
-        public string HireDate { get; set; }
+        public DateTime HireDate { get; set; }
         [Required]
         public string NationalID { get; set; }
         public double SickLeavesCount { get; set; }
@@ -35,5 +39,7 @@ namespace Agazaty.Models
         [ForeignKey("Department")]
         public int? Departement_ID { get; set; }
         public Department? Department { get; set; }
+        [Required]
+        public bool IsDepartmentManager { get; set; }
     }
 }

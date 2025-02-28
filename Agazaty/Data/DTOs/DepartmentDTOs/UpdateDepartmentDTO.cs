@@ -3,6 +3,6 @@
     public class UpdateDepartmentDTO
     {
         public string Name { get; set; }
-        public string ManagerNationalNumber { get; set; }
+        //public string ManagerNationalNumber { get; set; }
     }
 }

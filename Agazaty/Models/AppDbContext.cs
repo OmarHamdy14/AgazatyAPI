@@ -12,6 +12,7 @@ namespace Agazaty.Models
         }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            //modelBuilder.Entity<DepartmentsManagers>().HasKey(dm => new { dm.managerid, dm.departmentId });
             base.OnModelCreating(modelBuilder);
 
         }
@@ -23,5 +24,6 @@ namespace Agazaty.Models
         public DbSet<Department> Departments { get; set; }
         public DbSet<SickLeave> SickLeaves { get; set; }
         public DbSet<NormalLeave> NormalLeaves { get; set; }
+        public DbSet<DepartmentsManagers> DepartmentsManagers { get; set; }
     }
 }
