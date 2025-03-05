@@ -1,5 +1,7 @@
 ﻿using Agazaty.Data.Base;
+using Agazaty.Data.DTOs.DepartmentDTOs;
 using Agazaty.Data.DTOs.PermitLeavesDTOs;
+using Agazaty.Data.Services.Interfaces;
 using Agazaty.Models;
 using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
@@ -16,131 +18,164 @@ namespace Agazaty.Controllers
     {
         private readonly IEntityBaseRepository<PermitLeave> _Permitbase;
         private readonly IEntityBaseRepository<PermitLeaveImage> _PermitImagebase;
+        private readonly IAccountService _accountService;
         private readonly IWebHostEnvironment _webHostEnvironment;
         private readonly IMapper _mapper;
 
-        public PermitLeaveController(IMapper mapper, IEntityBaseRepository<PermitLeave> Ebase, IEntityBaseRepository<PermitLeaveImage> PermitImagebase, IWebHostEnvironment webHostEnvironment)
+        public PermitLeaveController(IAccountService accountService, IMapper mapper, IEntityBaseRepository<PermitLeave> Ebase, IEntityBaseRepository<PermitLeaveImage> PermitImagebase, IWebHostEnvironment webHostEnvironment)
         {
             _mapper = mapper;
             _Permitbase = Ebase;
             _PermitImagebase = PermitImagebase;
             _webHostEnvironment = webHostEnvironment;
+            _accountService = accountService;
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpGet("GetPermitLeaveById/{leaveID:int}", Name = "GetPermitLeave")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<PermitLeave> GetPermitLeaveById(int leaveID)
+        public async Task<ActionResult<PermitLeaveDTO>> GetPermitLeaveById(int leaveID)
         {
             if (leaveID <= 0)
                 return BadRequest(new { message = "Invalid leave ID." });
             try
             {
-                var permitLeave = _Permitbase.Get(c => c.Id == leaveID);
+                var permitLeave = await _Permitbase.Get(c => c.Id == leaveID);
                 if (permitLeave == null)
                 {
-                    return NotFound();
+                    return NotFound(new { Message = "No permit Leave found." });
                 }
-                return Ok(_mapper.Map<PermitLeaveDTO>(permitLeave));
+                var leave = _mapper.Map<PermitLeaveDTO>(permitLeave);
+                var user = await _accountService.FindById(permitLeave.UserId);
+                leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                return Ok(leave);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpGet("GetAllPermitLeaves", Name = "GetAllPermitLeaves")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<IEnumerable<PermitLeave>> GetAllPermitLeaves()
+        public async Task<ActionResult<IEnumerable<PermitLeaveDTO>>> GetAllPermitLeaves()
         {
             try
             {
-                var permitLeaves = _Permitbase.GetAll().ToList();
-                if (permitLeaves == null)
+                var permitLeaves = await _Permitbase.GetAll();
+                if (!permitLeaves.Any())
                 {
-                    return NotFound();
+                    return NotFound(new { Message = "Ino permit leaves found." });
                 }
-                return Ok(_mapper.Map<IEnumerable<PermitLeave>>(permitLeaves));
+
+                var leaves = _mapper.Map<IEnumerable<PermitLeaveDTO>>(permitLeaves);
+                foreach(var leave in leaves)
+                {
+                    var user = await _accountService.FindById(leave.UserId);
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                }
+                return Ok(leaves);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpGet("GetAllPermitLeavesByUserID/{userID}", Name = "GetAllPermitLeavesByUserID")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<IEnumerable<PermitLeave>> GetAllPermitLeavesByUserID(string userID)
+        public async Task<ActionResult<IEnumerable<PermitLeaveDTO>>> GetAllPermitLeavesByUserID(string userID)
         {
             if (string.IsNullOrWhiteSpace(userID))
                 return BadRequest(new { message = "Invalid user ID." });
             try
             {
-                var permitLeaves = _Permitbase.GetAll(p => p.UserId == userID).ToList();
-                if (permitLeaves == null)
+                var permitLeaves = await _Permitbase.GetAll(p => p.UserId == userID);
+                if (!permitLeaves.Any())
                 {
-                    return NotFound();
+                    return NotFound(new { Message = "no permit leaves found" });
                 }
-                return Ok(_mapper.Map<IEnumerable<PermitLeave>>(permitLeaves));
+
+                var leaves = _mapper.Map<IEnumerable<PermitLeaveDTO>>(permitLeaves);
+                foreach (var leave in leaves)
+                {
+                    var user = await _accountService.FindById(leave.UserId);
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                }
+                return Ok(leaves);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpGet("GetAllPermitLeavesByUserIDAndMonth/{userID}/{month:int}", Name = "GetAllPermitLeavesByUserIDAndMonth")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<IEnumerable<PermitLeave>> GetAllPermitLeavesByUserIDAndMonth(string userID, int month)
+        public async Task<ActionResult<IEnumerable<PermitLeaveDTO>>> GetAllPermitLeavesByUserIDAndMonth(string userID, int month)
         {
-            if (string.IsNullOrWhiteSpace(userID) || month<=0)
+            if (string.IsNullOrWhiteSpace(userID) || month < 1 || month > 12)
                 return BadRequest(new { message = "Invalid user ID or month." });
             try
             {
-                var permitLeaves = _Permitbase.GetAll(p => p.UserId == userID &&
-                                   p.Date.Month == month).ToList();
-                if (permitLeaves == null)
+                var permitLeaves = await _Permitbase.GetAll(p => p.UserId == userID &&
+                                   p.Date.Month == month);
+                if (!permitLeaves.Any())
                 {
-                    return NotFound();
+                    return NotFound(new { Message = "no permit leaves found." });
                 }
-                return Ok(_mapper.Map<IEnumerable<PermitLeave>>(permitLeaves));
+
+                var leaves = _mapper.Map<IEnumerable<PermitLeaveDTO>>(permitLeaves);
+                foreach (var leave in leaves)
+                {
+                    var user = await _accountService.FindById(leave.UserId);
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                }
+                return Ok(leaves);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpGet("GetAllPermitLeavesByUserIDAndYear/{userID}/{year:int}", Name = "GetAllPermitLeavesByUserIDAndYear")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public ActionResult<IEnumerable<PermitLeave>> GetAllPermitLeavesByUserIDAndYear(string userID, int year)
+        public async Task<ActionResult<IEnumerable<PermitLeaveDTO>>> GetAllPermitLeavesByUserIDAndYear(string userID, int year)
         {
             if (string.IsNullOrWhiteSpace(userID) || year < 1900)
-                return BadRequest(new { message = "Invalid user IDor year." });
+                return BadRequest(new { message = "Invalid user ID or year." });
             try
             {
-                var permitLeaves = _Permitbase.GetAll(p => p.UserId == userID &&
-                                   p.Date.Year == year).ToList();
-                if (permitLeaves == null)
+                var permitLeaves = await _Permitbase.GetAll(p => p.UserId == userID &&
+                                   p.Date.Year == year);
+                if (!permitLeaves.Any())
                 {
-                    return NotFound();
+                    return NotFound(new{ Message = "no permit leaves found."});
                 }
-                return Ok(_mapper.Map<IEnumerable<PermitLeave>>(permitLeaves));
+
+                var leaves = _mapper.Map<IEnumerable<PermitLeaveDTO>>(permitLeaves);
+                foreach (var leave in leaves)
+                {
+                    var user = await _accountService.FindById(leave.UserId);
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                }
+                return Ok(leaves);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPost("CreatePermitLeave", Name = "CreatePermitLeave")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public ActionResult<PermitLeave> CreatePermitLeave([FromForm] CreatePermitLeaveDTO model, [FromForm] List<IFormFile>? files)
+        public async Task<ActionResult<PermitLeave>> CreatePermitLeave([FromForm] CreatePermitLeaveDTO model, [FromForm] List<IFormFile>? files)
         {
             try
             {
@@ -149,6 +184,8 @@ namespace Agazaty.Controllers
                     return BadRequest(ModelState);
                 }
                 
+                if (model.Hours <= 0) return BadRequest(new { Message = "Hours should be more than 0." });
+                if(await _accountService.FindById(model.UserId) is null) return BadRequest(new { Message = "User is not found." });
 
                 var permitLeave = _mapper.Map<PermitLeave>(model);
 
@@ -184,25 +221,28 @@ namespace Agazaty.Controllers
                         permitLeave.PermitLeaveImages.Add(permitLeaveImage);
                     }
                 }
-                _Permitbase.Add(permitLeave);
+                await _Permitbase.Add(permitLeave);
 
-                return Ok(new { Message =  "Creation is succeeded"});
+                var leave = _mapper.Map<PermitLeaveDTO>(permitLeave);
+                var user = await _accountService.FindById(permitLeave.UserId);
+                leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                return CreatedAtAction(nameof(GetPermitLeaveById), new { leaveID = permitLeave.Id }, leave);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPut("UpdatePermitLeave/{leaveID:int}", Name = "UpdatePermitLeave")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult UpdatePermitLeave(int leaveID, [FromForm] UpdatePermitLeaveDTO model, [FromForm] List<IFormFile>? files)
+        public async Task<IActionResult> UpdatePermitLeave(int leaveID, [FromForm] UpdatePermitLeaveDTO model, [FromForm] List<IFormFile>? files) 
         {
             if (leaveID<=0)
             {
-                return BadRequest();
+                return BadRequest(new { Message = "Invalid leave Id." });
             }
             try
             {
@@ -210,17 +250,18 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(ModelState);
                 }
+                if (model.Hours <= 0) return BadRequest(new { Message = "Hours should be more than 0." });
+                if (await _accountService.FindById(model.UserId) is null) return BadRequest(new { Message = "User is not found." });
 
-                var permitLeave = _Permitbase.Get(c => c.Id == leaveID);
+
+                var permitLeave = await _Permitbase.Get(c => c.Id == leaveID);
                 if (permitLeave == null)
                 {
-                    return NotFound();
+                    return NotFound(new { Message = "no permit leaves found." });
                 }
-                //permitLeave = _mapper.Map<PermitLeave>(model);
-                permitLeave.Hours = model.Hours;
-                permitLeave.EmployeeNationalNumber = model.EmployeeNationalNumber;
-                permitLeave.UserId = model.UserId;
-                permitLeave.Date = model.Date;
+
+                _mapper.Map(model, permitLeave);
+
                 string wwwRootPath = _webHostEnvironment.WebRootPath;
                 if (files != null)
                 {
@@ -253,31 +294,35 @@ namespace Agazaty.Controllers
                         permitLeave.PermitLeaveImages.Add(permitLeaveImage);
                     }
                 }
-                _Permitbase.Update(permitLeave);
-                return NoContent();
+                await _Permitbase.Update(permitLeave);
+
+                var leave = _mapper.Map<PermitLeaveDTO>(permitLeave);
+                var user = await _accountService.FindById(permitLeave.UserId);
+                leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                return Ok(new {Message="Update is succeeded",PermitLeave = leave });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpDelete("DeletePermitLeave/{leaveID:int}", Name = "DeletePermitLeave")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult DeletePermitLeave(int leaveID)
+        public async Task<IActionResult> DeletePermitLeave(int leaveID)
         {
             if (leaveID<=0)
             {
-                return BadRequest();
+                return BadRequest(new { Message = "Invalid leave Id" });
             }
             try
             {
-                var permitLeave = _Permitbase.Get(c => c.Id == leaveID);
+                var permitLeave = await _Permitbase.Get(c => c.Id == leaveID);
                 if (permitLeave == null)
                 {
-                    return NotFound();
+                    return NotFound(new {Message = "No Permit Leave found"});
                 }
                 string permitLeavePath = @"images\Permitleaves\PermitLeaveUser-" + permitLeave.UserId;
                 string finalPath = Path.Combine(_webHostEnvironment.WebRootPath, permitLeavePath);
@@ -291,26 +336,26 @@ namespace Agazaty.Controllers
                     }
                     Directory.Delete(finalPath);
                 }
-                _Permitbase.Remove(permitLeave);
+                await _Permitbase.Remove(permitLeave);
 
-                return NoContent();
+                return Ok(new { Message = "Deletion is succeeded." });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpDelete("DeleteImage/{imageId:int}", Name = "DeleteImage")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult DeleteImage(int imageId)
+        public async Task<IActionResult> DeleteImage(int imageId)
         {
             if (imageId <= 0)
-                return BadRequest();
+                return BadRequest(new { Message = "Invalid image Id" });
             try
             {
-                var imageToBeDeleted = _PermitImagebase.Get(pi => pi.Id == imageId);
+                var imageToBeDeleted = await _PermitImagebase.Get(pi => pi.Id == imageId);
                 if (imageToBeDeleted != null)
                 {
                     if (!string.IsNullOrEmpty(imageToBeDeleted.ImageUrl))
@@ -321,11 +366,11 @@ namespace Agazaty.Controllers
                             System.IO.File.Delete(oldImagePath);
                         }
                     }
-                    _PermitImagebase.Remove(imageToBeDeleted);
+                    await _PermitImagebase.Remove(imageToBeDeleted);
 
-                    return NoContent();
+                    return Ok(new { Message = "Deletion is succeeded." });
                 }
-                return NotFound();
+                return NotFound(new { Message = "no image found." });
             }
             catch (Exception ex)
             {

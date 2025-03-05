@@ -19,61 +19,67 @@ namespace Agazaty.Controllers
         private readonly IEntityBaseRepository<Department> _base;
         private readonly IAccountService _accountService;
         private readonly IMapper _mapper;
-        private readonly IEntityBaseRepository<DepartmentsManagers> _baseDepartmentsManagers;
-        public DepartmentController(IMapper mapper, IEntityBaseRepository<Department> Ebase, IAccountService accountService, IEntityBaseRepository<DepartmentsManagers> baseDepartmentsManagers)
+        public DepartmentController(IMapper mapper, IEntityBaseRepository<Department> Ebase, IAccountService accountService)
         {
             _mapper = mapper;
             _base = Ebase;
             _accountService = accountService;
-            _baseDepartmentsManagers = baseDepartmentsManagers;
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetAllDepartments")]
-        public IActionResult GetAllDepartments()
+        public async Task<IActionResult> GetAllDepartments()
         {
             try
             {
-                var departments = _base.GetAll().ToList();
+                var departments = await _base.GetAll();
 
                 if (!departments.Any())
                 {
                     return NotFound("No departments found.");
                 }
-
-                return Ok(departments);
+                var depts = _mapper.Map<IEnumerable<DepartmentDTO>>(departments);
+                foreach(var dept in depts)
+                {
+                    var manager = await _accountService.FindById(dept.ManagerId);
+                    dept.ManagerName = $"{manager.FirstName} {manager.SecondName} {manager.ThirdName} {manager.ForthName}";
+                }
+                return Ok(depts);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while retrieving departments.");
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetDepartmentById/{departmentID:int}")]
-        public IActionResult GetDepartmentById(int departmentID)
+        public async Task<IActionResult> GetDepartmentById(int departmentID)
         {
             if (departmentID <= 0)
             {
-                return BadRequest();
+                return BadRequest(new { Message = "Invalid department Id" });
             }
             try
             {
-                var department = _base.Get(d => d.Id == departmentID);
+                var department = await _base.Get(d => d.Id == departmentID);
 
                 if (department == null)
                 {
                     return NotFound($"No department found with ID {departmentID}.");
                 }
 
-                return Ok(department);
+                var dept = _mapper.Map<DepartmentDTO>(department);
+                var manager = await _accountService.FindById(dept.ManagerId);
+                dept.ManagerName = $"{manager.FirstName} {manager.SecondName} {manager.ThirdName} {manager.ForthName}";
+                return Ok(dept);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while retrieving the department.");
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpPost("CreateDepartment")]
-        public IActionResult CreateDepartment([FromBody]CreateDepartmentDTO model)
+        public async Task<IActionResult> CreateDepartment([FromBody]CreateDepartmentDTO model)
         {
 
             try
@@ -86,25 +92,30 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(ModelState);
                 }
-                //var res = _accountService.FindByNationalId(model.ManagerNationalNumber);
-                //if (res == null)
-                //{
-                //    return NotFound(new { Message = "Manager National Number is not found" });
-                //}
+                var res = await _accountService.FindById(model.ManagerId);
+                if (res == null)
+                {
+                    return NotFound(new { Message = "Manager is not found" });
+                }
+
                 var department = _mapper.Map<Department>(model);
+                await _base.Add(department);
+                var manager = await _accountService.FindById(department.ManagerId);
+                manager.Departement_ID = department.Id;
+                await _accountService.Update(manager);
 
-                _base.Add(department);
-
-                return CreatedAtAction(nameof(CreateDepartment), new { id = department.Id }, department);
+                var dept = _mapper.Map<DepartmentDTO>(department);
+                dept.ManagerName = $"{manager.FirstName} {manager.SecondName} {manager.ThirdName} {manager.ForthName}";
+                return CreatedAtAction(nameof(GetDepartmentById), new { departmentID = department.Id }, dept);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while creating the department.");
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpPut("UpdateDepartment/{departmentID:int}")]
-        public IActionResult UpdateDepartment([FromRoute]int departmentID, [FromBody]UpdateDepartmentDTO model)
+        public async Task<IActionResult> UpdateDepartment([FromRoute]int departmentID, [FromBody]UpdateDepartmentDTO model)
         {
             if (departmentID<=0)
             {
@@ -117,65 +128,61 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(ModelState);
                 }
-                //var res = _accountService.FindByNationalId(model.ManagerNationalNumber);
-                //if (res == null)
-                //{
-                //    return NotFound(new { Message = "Manager National Number is not found" });
-                //}
-
-                var department = _base.Get(d => d.Id == departmentID);
-
-                if (department == null)
+                var res = await _accountService.FindById(model.ManagerId);
+                if (res == null)
                 {
-                    return NotFound($"Department with ID {departmentID} not found.");
+                    return NotFound(new { Message = "Manager is not found" });
                 }
 
-                //department = _mapper.Map<Department>(model);
-                department.Name = model.Name;
-                //department.ManagerNationalNumber = model.ManagerNationalNumber;
+                var department = await _base.Get(d => d.Id == departmentID);
+                if (department == null)
+                {
+                    return NotFound(new { Message = "Department is not found." });
+                }
 
-                _base.Update(department);
+                _mapper.Map(model, department);
+                await _base.Update(department);
 
-                return Ok($"Department {department.Id} has been successfully updated.");
+                var dept = _mapper.Map<DepartmentDTO>(department);
+                var manager = await _accountService.FindById(dept.ManagerId);
+                dept.ManagerName = $"{manager.FirstName} {manager.SecondName} {manager.ThirdName} {manager.ForthName}";
+                return Ok(new { Message = $"Department has been successfully updated.", Department = dept });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while updating the department.");
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpDelete("DeleteDepartment/{departmentID:int}")]
         public async Task<IActionResult> DeleteDepartment(int departmentID)
         {
             if (departmentID <= 0)
             {
-                return BadRequest();
+                return BadRequest(new { Message = "Invalid department Id." });
             }
 
             try
             {
-                var department = _base.Get(d => d.Id == departmentID);
+                var department = await _base.Get(d => d.Id == departmentID);
 
                 if (department == null)
                 {
-                    return NotFound($"No department found with ID {departmentID}.");
+                    return NotFound($"No department found.");
                 }
-                var entity = _baseDepartmentsManagers.Get(dm => dm.departmentId == department.Id);
-                if (entity != null)
+                var users = await _accountService.GetAllUsersByDepartmentId(departmentID);
+                if (users.Any())
                 {
-                    var manager = await _accountService.FindById(entity.managerid);
-                    manager.IsDepartmentManager = false;
-                    await _accountService.Update(manager);
-                    _baseDepartmentsManagers.Remove(entity);
+                    return BadRequest(new { Message = "This department has members, Edit their department to another one so you can delete this department." });
                 }
 
-                _base.Remove(department);
+                await _base.Remove(department);
 
-                return Ok($"Department {department.Id} has been successfully deleted.");
+                return Ok($"Department has been successfully deleted.");
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while deleting the department.");
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
     }

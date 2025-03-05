@@ -1,15 +1,12 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-
-namespace Agazaty.Models
+﻿namespace Agazaty.Data.DTOs.DepartmentDTOs
 {
-    public class Department
+    public class DepartmentDTO
     {
         public int Id { get; set; }
         public string Name { get; set; }
         public string Code { get; set; }
         public DateTime CreateDate { get; set; }
-        public IEnumerable<ApplicationUser> Members { get; set; }
         public string ManagerId { get; set; }
+        public string ManagerName { get; set; }
     }
 }

@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Agazaty.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250226233221_V9")]
-    partial class V9
+    [Migration("20250305112217_V2")]
+    partial class V2
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
@@ -42,12 +42,10 @@ namespace Agazaty.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("DateOfBirth")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<DateTime>("DateOfBirth")
+                        .HasColumnType("datetime2");
 
                     b.Property<int?>("Departement_ID")
-                        .IsRequired()
                         .HasColumnType("int");
 
                     b.Property<string>("Email")
@@ -57,13 +55,23 @@ namespace Agazaty.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ForthName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("Gender")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("HireDate")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<DateTime>("HireDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IntializationCheck")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("bit");
@@ -95,14 +103,19 @@ namespace Agazaty.Migrations
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
 
-                    b.Property<int>("Position")
-                        .HasColumnType("int");
+                    b.Property<string>("SecondName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<double>("SickLeavesCount")
                         .HasColumnType("float");
+
+                    b.Property<string>("ThirdName")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("bit");
@@ -162,10 +175,14 @@ namespace Agazaty.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1L, 1);
 
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("ManagerNationalNumber")
+                    b.Property<string>("ManagerId")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
@@ -264,10 +281,6 @@ namespace Agazaty.Migrations
 
                     b.Property<DateTime>("Date")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("EmployeeNationalNumber")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<double>("Hours")
                         .HasColumnType("float");
@@ -480,10 +493,8 @@ namespace Agazaty.Migrations
             modelBuilder.Entity("Agazaty.Models.ApplicationUser", b =>
                 {
                     b.HasOne("Agazaty.Models.Department", "Department")
-                        .WithMany("users")
-                        .HasForeignKey("Departement_ID")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .WithMany("Members")
+                        .HasForeignKey("Departement_ID");
 
                     b.Navigation("Department");
                 });
@@ -596,7 +607,7 @@ namespace Agazaty.Migrations
 
             modelBuilder.Entity("Agazaty.Models.Department", b =>
                 {
-                    b.Navigation("users");
+                    b.Navigation("Members");
                 });
 
             modelBuilder.Entity("Agazaty.Models.PermitLeave", b =>

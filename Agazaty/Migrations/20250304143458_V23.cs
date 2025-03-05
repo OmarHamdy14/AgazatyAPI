@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Agazaty.Migrations
 {
-    public partial class V1 : Migration
+    public partial class V23 : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
@@ -24,48 +24,15 @@ namespace Agazaty.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "AspNetUsers",
-                columns: table => new
-                {
-                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
-                    DateOfBirth = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Position = table.Column<int>(type: "int", nullable: false),
-                    Gender = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Active = table.Column<bool>(type: "bit", nullable: false),
-                    HireDate = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    NationalID = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    NormalLeavesCount = table.Column<double>(type: "float", nullable: false),
-                    CasualLeavesCount = table.Column<double>(type: "float", nullable: false),
-                    Departement_ID = table.Column<int>(type: "int", nullable: false),
-                    UserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    NormalizedUserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    NormalizedEmail = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
-                    EmailConfirmed = table.Column<bool>(type: "bit", nullable: false),
-                    PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    SecurityStamp = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    ConcurrencyStamp = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    PhoneNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    PhoneNumberConfirmed = table.Column<bool>(type: "bit", nullable: false),
-                    TwoFactorEnabled = table.Column<bool>(type: "bit", nullable: false),
-                    LockoutEnd = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
-                    LockoutEnabled = table.Column<bool>(type: "bit", nullable: false),
-                    AccessFailedCount = table.Column<int>(type: "int", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AspNetUsers", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "Departments",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Code = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     CreateDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    ManagerNationalNumber = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                    ManagerId = table.Column<string>(type: "nvarchar(max)", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -91,6 +58,52 @@ namespace Agazaty.Migrations
                         principalTable: "AspNetRoles",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "AspNetUsers",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ActiveToken = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    FirstName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    SecondName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ThirdName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ForthName = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    DateOfBirth = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Gender = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    HireDate = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    NationalID = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    NormalLeavesCount = table.Column<double>(type: "float", nullable: false),
+                    CasualLeavesCount = table.Column<double>(type: "float", nullable: false),
+                    SickLeavesCount = table.Column<double>(type: "float", nullable: false),
+                    PermitLeavesCount = table.Column<double>(type: "float", nullable: false),
+                    Departement_ID = table.Column<int>(type: "int", nullable: true),
+                    IntializationCheck = table.Column<bool>(type: "bit", nullable: false),
+                    Active = table.Column<bool>(type: "bit", nullable: false),
+                    UserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    NormalizedUserName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    Email = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    NormalizedEmail = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    EmailConfirmed = table.Column<bool>(type: "bit", nullable: false),
+                    PasswordHash = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    SecurityStamp = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    ConcurrencyStamp = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PhoneNumber = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    PhoneNumberConfirmed = table.Column<bool>(type: "bit", nullable: false),
+                    TwoFactorEnabled = table.Column<bool>(type: "bit", nullable: false),
+                    LockoutEnd = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: true),
+                    LockoutEnabled = table.Column<bool>(type: "bit", nullable: false),
+                    AccessFailedCount = table.Column<int>(type: "int", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AspNetUsers", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_AspNetUsers_Departments_Departement_ID",
+                        column: x => x.Departement_ID,
+                        principalTable: "Departments",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -204,12 +217,12 @@ namespace Agazaty.Migrations
                 name: "NormalLeaves",
                 columns: table => new
                 {
-                    NormalLeaveID = table.Column<int>(type: "int", nullable: false)
+                    ID = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    User_ID = table.Column<string>(type: "nvarchar(450)", nullable: true),
-                    Direct_ManagerID = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    General_ManagerID = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    Coworker_ID = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UserID = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Direct_ManagerID = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    General_ManagerID = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Coworker_ID = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     RequestDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     StartDate = table.Column<DateTime>(type: "datetime2", nullable: false),
                     EndDate = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -221,16 +234,20 @@ namespace Agazaty.Migrations
                     CoWorker_Decision = table.Column<bool>(type: "bit", nullable: false),
                     ResponseDone = table.Column<bool>(type: "bit", nullable: false),
                     DisapproveReasonOfGeneral_Manager = table.Column<string>(type: "nvarchar(max)", nullable: true),
-                    DisapproveReasonOfDirect_Manager = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    DisapproveReasonOfDirect_Manager = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    LeaveStatus = table.Column<int>(type: "int", nullable: false),
+                    Holder = table.Column<int>(type: "int", nullable: false),
+                    RejectedBy = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_NormalLeaves", x => x.NormalLeaveID);
+                    table.PrimaryKey("PK_NormalLeaves", x => x.ID);
                     table.ForeignKey(
-                        name: "FK_NormalLeaves_AspNetUsers_User_ID",
-                        column: x => x.User_ID,
+                        name: "FK_NormalLeaves_AspNetUsers_UserID",
+                        column: x => x.UserID,
                         principalTable: "AspNetUsers",
-                        principalColumn: "Id");
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -264,17 +281,17 @@ namespace Agazaty.Migrations
                     Disease = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     EmployeeAddress = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     RequestDate = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    MedicalCommitteAddress = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    MedicalCommitteAddress = table.Column<string>(type: "nvarchar(max)", nullable: true),
                     RespononseDone = table.Column<bool>(type: "bit", nullable: false),
                     Year = table.Column<int>(type: "int", nullable: false),
-                    User_ID = table.Column<string>(type: "nvarchar(450)", nullable: false)
+                    UserID = table.Column<string>(type: "nvarchar(450)", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_SickLeaves", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_SickLeaves_AspNetUsers_User_ID",
-                        column: x => x.User_ID,
+                        name: "FK_SickLeaves_AspNetUsers_UserID",
+                        column: x => x.UserID,
                         principalTable: "AspNetUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
@@ -333,6 +350,11 @@ namespace Agazaty.Migrations
                 column: "NormalizedEmail");
 
             migrationBuilder.CreateIndex(
+                name: "IX_AspNetUsers_Departement_ID",
+                table: "AspNetUsers",
+                column: "Departement_ID");
+
+            migrationBuilder.CreateIndex(
                 name: "UserNameIndex",
                 table: "AspNetUsers",
                 column: "NormalizedUserName",
@@ -345,9 +367,9 @@ namespace Agazaty.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_NormalLeaves_User_ID",
+                name: "IX_NormalLeaves_UserID",
                 table: "NormalLeaves",
-                column: "User_ID");
+                column: "UserID");
 
             migrationBuilder.CreateIndex(
                 name: "IX_PermitLeaveImages_LeaveId",
@@ -360,9 +382,9 @@ namespace Agazaty.Migrations
                 column: "UserId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_SickLeaves_User_ID",
+                name: "IX_SickLeaves_UserID",
                 table: "SickLeaves",
-                column: "User_ID");
+                column: "UserID");
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
@@ -386,9 +408,6 @@ namespace Agazaty.Migrations
                 name: "CasualLeaves");
 
             migrationBuilder.DropTable(
-                name: "Departments");
-
-            migrationBuilder.DropTable(
                 name: "NormalLeaves");
 
             migrationBuilder.DropTable(
@@ -405,6 +424,9 @@ namespace Agazaty.Migrations
 
             migrationBuilder.DropTable(
                 name: "AspNetUsers");
+
+            migrationBuilder.DropTable(
+                name: "Departments");
         }
     }
 }

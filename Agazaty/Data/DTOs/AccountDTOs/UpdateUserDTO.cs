@@ -29,14 +29,16 @@ namespace Agazaty.Data.DTOs.AccountDTOs
         [Required]
         [RegularExpression(@"^\d{11}$", ErrorMessage = "The Phone Number field must contain exactly 11 digits with no spaces or other characters.")]
         public string PhoneNumber { get; set; }
-        //[Required]
-       // public string Password { get; set; }
         [Required]
-        public int Position { get; set; }
+        public string Gender { get; set; }
         [Required]
         public DateTime DateOfBirth { get; set; }
+        public double SickLeavesCount { get; set; }
+        [Range(0, double.MaxValue)]
+        public double NormalLeavesCount { get; set; }
+        [Range(0, double.MaxValue)]
+        public double CasualLeavesCount { get; set; }
+        public double PermitLeavesCount { get; set; }
         public int? Departement_ID { get; set; }
-        //[Required]
-        public bool IsDepartmentManager { get; set; }
     }
 }

@@ -71,9 +71,6 @@ namespace Agazaty.Migrations
                     b.Property<bool>("IntializationCheck")
                         .HasColumnType("bit");
 
-                    b.Property<bool>("IsDepartmentManager")
-                        .HasColumnType("bit");
-
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("bit");
 
@@ -98,17 +95,11 @@ namespace Agazaty.Migrations
                     b.Property<string>("PasswordHash")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<double>("PermitLeavesCount")
-                        .HasColumnType("float");
-
                     b.Property<string>("PhoneNumber")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
-
-                    b.Property<int>("Position")
-                        .HasColumnType("int");
 
                     b.Property<string>("SecondName")
                         .IsRequired()
@@ -171,7 +162,7 @@ namespace Agazaty.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("CasualLeaves", (string)null);
+                    b.ToTable("CasualLeaves");
                 });
 
             modelBuilder.Entity("Agazaty.Models.Department", b =>
@@ -182,8 +173,16 @@ namespace Agazaty.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1L, 1);
 
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("CreateDate")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("ManagerId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -191,27 +190,7 @@ namespace Agazaty.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Departments", (string)null);
-                });
-
-            modelBuilder.Entity("Agazaty.Models.DepartmentsManagers", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"), 1L, 1);
-
-                    b.Property<int>("departmentId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("managerid")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("DepartmentsManagers", (string)null);
+                    b.ToTable("Departments");
                 });
 
             modelBuilder.Entity("Agazaty.Models.NormalLeave", b =>
@@ -287,7 +266,7 @@ namespace Agazaty.Migrations
 
                     b.HasIndex("UserID");
 
-                    b.ToTable("NormalLeaves", (string)null);
+                    b.ToTable("NormalLeaves");
                 });
 
             modelBuilder.Entity("Agazaty.Models.PermitLeave", b =>
@@ -301,10 +280,6 @@ namespace Agazaty.Migrations
                     b.Property<DateTime>("Date")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("EmployeeNationalNumber")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<double>("Hours")
                         .HasColumnType("float");
 
@@ -316,7 +291,7 @@ namespace Agazaty.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("PermitLeaves", (string)null);
+                    b.ToTable("PermitLeaves");
                 });
 
             modelBuilder.Entity("Agazaty.Models.PermitLeaveImage", b =>
@@ -338,7 +313,7 @@ namespace Agazaty.Migrations
 
                     b.HasIndex("LeaveId");
 
-                    b.ToTable("PermitLeaveImages", (string)null);
+                    b.ToTable("PermitLeaveImages");
                 });
 
             modelBuilder.Entity("Agazaty.Models.SickLeave", b =>
@@ -377,7 +352,7 @@ namespace Agazaty.Migrations
 
                     b.HasIndex("UserID");
 
-                    b.ToTable("SickLeaves", (string)null);
+                    b.ToTable("SickLeaves");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -516,7 +491,7 @@ namespace Agazaty.Migrations
             modelBuilder.Entity("Agazaty.Models.ApplicationUser", b =>
                 {
                     b.HasOne("Agazaty.Models.Department", "Department")
-                        .WithMany()
+                        .WithMany("Members")
                         .HasForeignKey("Departement_ID");
 
                     b.Navigation("Department");
@@ -626,6 +601,11 @@ namespace Agazaty.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Agazaty.Models.Department", b =>
+                {
+                    b.Navigation("Members");
                 });
 
             modelBuilder.Entity("Agazaty.Models.PermitLeave", b =>

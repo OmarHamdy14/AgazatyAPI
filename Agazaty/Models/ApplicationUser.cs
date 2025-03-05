@@ -7,6 +7,7 @@ namespace Agazaty.Models
 {
     public class ApplicationUser : IdentityUser
     {
+        //public string? ActiveToken { get; set; }
         [Required]
         [RegularExpression(@"^[\p{L}]+$", ErrorMessage = "The First Namefield must contain only letters (English or Arabic), with no numbers or spaces.")]
         public string FirstName { get; set; }
@@ -22,29 +23,23 @@ namespace Agazaty.Models
         [Required]
         public DateTime DateOfBirth { get; set; }
         [Required]
-        public int Position { get; set; }
-        [Required]
-        public bool Active { get; set; }
-        [Required]
         public string Gender { get; set; }
         [Required]
         public DateTime HireDate { get; set; }
         [Required]
         [RegularExpression(@"^\d{14}$", ErrorMessage = "The National Number field must contain exactly 14 digits with no spaces or other characters.")]
         public string NationalID { get; set; }
-        public double SickLeavesCount { get; set; }
+        [Required]
         [Range(0, double.MaxValue)]
         public double NormalLeavesCount { get; set; }
         [Range(0, double.MaxValue)]
         public double CasualLeavesCount { get; set; }
-        public double PermitLeavesCount { get; set; }
-        [DefaultValue(true)]
-        public bool IntializationCheck { get; set; }
-        //[Required]
+        public double SickLeavesCount { get; set; }
         [ForeignKey("Department")]
         public int? Departement_ID { get; set; }
         public Department? Department { get; set; }
-        //[Required]
-        public bool IsDepartmentManager { get; set; }
+        [DefaultValue(true)]
+        public bool IntializationCheck { get; set; }
+        public bool Active { get; set; }
     }
 }

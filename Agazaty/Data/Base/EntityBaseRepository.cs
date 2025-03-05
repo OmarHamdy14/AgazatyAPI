@@ -16,7 +16,7 @@ namespace Agazaty.Data.Base
             _appDbContext = appDbContext;
             this.dbSet = _appDbContext.Set<T>();
         }
-        public T Get(Expression<Func<T, bool>> filter, string? includeProp = null, bool tracked = false)
+        public async Task<T> Get(Expression<Func<T, bool>> filter, string? includeProp = null, bool tracked = false)
         {
 
             IQueryable<T> query;
@@ -36,10 +36,10 @@ namespace Agazaty.Data.Base
                     query = query.Include(prop);
                 }
             }
-            return query.FirstOrDefault();
+            return await query.FirstOrDefaultAsync();
 
         }
-        public IEnumerable<T> GetAll(Expression<Func<T, bool>>? filter = null, string? includeProp = null)
+        public async Task<IEnumerable<T>> GetAll(Expression<Func<T, bool>>? filter = null, string? includeProp = null)
         {
             IQueryable<T> query = dbSet;
             if (filter != null)
@@ -53,28 +53,28 @@ namespace Agazaty.Data.Base
                     query = query.Include(prop);
                 }
             }
-            return query.ToList();
+            return await query.ToListAsync();
         }
-        public void Add(T entity)
+        public async Task Add(T entity)
         {
-            dbSet.Add(entity);
-            _appDbContext.SaveChanges();
+            await dbSet.AddAsync(entity);
+            await _appDbContext.SaveChangesAsync();
         }
-        public void Update(T entity)
+        public async Task Update(T entity)
         {
             EntityEntry e = _appDbContext.Entry<T>(entity);
             e.State = EntityState.Modified;
-            _appDbContext.SaveChanges();
+            await _appDbContext.SaveChangesAsync();
         }
-        public void Remove(T entity)
+        public async Task Remove(T entity)
         {
             dbSet.Remove(entity);
-            _appDbContext.SaveChanges();
+            await _appDbContext.SaveChangesAsync();
         }
-        public void RemoveRange(IEnumerable<T> entity)
+        public async Task RemoveRange(IEnumerable<T> entity)
         {
             dbSet.RemoveRange(entity);
-            _appDbContext.SaveChanges();
+            await _appDbContext.SaveChangesAsync();
         }
     }
 }

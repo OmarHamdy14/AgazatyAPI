@@ -1,11 +1,15 @@
 ﻿using Agazaty.Data.Base;
 using Agazaty.Data.DTOs.CasualLeaveDTOs;
+using Agazaty.Data.DTOs.RoleDTOs;
 using Agazaty.Data.DTOs.SickLeaveDTOs;
+using Agazaty.Data.Services.Interfaces;
 using Agazaty.Models;
 using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Data;
+using System.Net;
 
 namespace Agazaty.Controllers
 {
@@ -14,71 +18,92 @@ namespace Agazaty.Controllers
     public class SickLeaveController : ControllerBase
     {
         private readonly IEntityBaseRepository<SickLeave> _base;
+        private readonly IAccountService _accoutnService;
         private readonly IMapper _mapper;
-        public SickLeaveController(IMapper mapper, IEntityBaseRepository<SickLeave> Ebase)
+        public SickLeaveController(IAccountService accoutnService, IMapper mapper, IEntityBaseRepository<SickLeave> Ebase)
         {
             _mapper = mapper;
             _base = Ebase;
+            _accoutnService = accoutnService;
         }
-        [Authorize]
+        //[Authorize]
         [HttpGet("GetSickLeaveById/{leaveID:int}")]
-        public IActionResult GetSickLeaveById(int leaveID)
+        public async Task<IActionResult> GetSickLeaveById(int leaveID)
         {
             if (leaveID <= 0)
                 return BadRequest(new { message = "Invalid leave ID." });
             try
             {
 
-                var sikLeave = _base.Get(s => s.Id == leaveID);
+                var sikLeave = await _base.Get(s => s.Id == leaveID);
                 if (sikLeave == null)
                 {
                     return NotFound(new { message = $"No sick leave found for this leave ID {leaveID}." });
                 }
-                return Ok(sikLeave);
+
+                var leave = _mapper.Map<SickLeaveDTO>(sikLeave);
+                var user = await _accoutnService.FindById(leave.UserID);
+                leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                return Ok(leave);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpGet("GetAllSickLeavesByUserID/{userID}")]
-        public IActionResult GetAllSickLeavesByUserID(string userID)
+        public async Task<IActionResult> GetAllSickLeavesByUserID(string userID)
         {
             if (string.IsNullOrWhiteSpace(userID))
                 return BadRequest(new { message = "Invalid user ID." });
             try
             {
 
-                var sickleaves = _base.GetAll(s => s.UserID == userID).ToList();
-                if (sickleaves.Count == 0)
+                var sickleaves = await _base.GetAll(s => s.UserID == userID);
+                if (!sickleaves.Any())
                 {
                     return NotFound(new { message = $"No sick leaves found for this User ID {userID}." });
                 }
-                return Ok(sickleaves);
+
+                var leaves = _mapper.Map<IEnumerable<SickLeaveDTO>>(sickleaves);
+                foreach(var leave in leaves)
+                {
+                    var user = await _accoutnService.FindById(leave.UserID);
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                }
+                return Ok(leaves);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetAllSickLeave")]
-        public IActionResult GetAllSickLeave()
+        public async Task<IActionResult> GetAllSickLeave()
         {
             try
             {
-                var sickLeaves = _base.GetAll().ToList();
-                return Ok(sickLeaves);
+                var sickLeaves = await _base.GetAll();
+                if (!sickLeaves.Any()) return NotFound(new {Message = "no sick leaves found."});
+
+                var leaves = _mapper.Map<IEnumerable<SickLeaveDTO>>(sickLeaves);
+                foreach (var leave in leaves)
+                {
+                    var user = await _accoutnService.FindById(leave.UserID);
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                }
+                return Ok(leaves);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while retrieving sick leaves.");
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpGet("GetAllSickLeavesByUserIDAndYear/{userID}/{year:int}")]
-        public IActionResult GetAllSickLeavesByUserIDAndYear(string userID, int year)
+        public async Task<IActionResult> GetAllSickLeavesByUserIDAndYear(string userID, int year)
         {
             if (string.IsNullOrWhiteSpace(userID) || year < 1900)
             {
@@ -87,43 +112,55 @@ namespace Agazaty.Controllers
 
             try
             {
-                var sickLeaves = _base.GetAll(s => s.UserID == userID && s.Year == year).ToList();
+                var sickLeaves = await _base.GetAll(s => s.UserID == userID && s.Year == year);
 
                 if (sickLeaves.Any())
                 {
-                    return Ok(sickLeaves);
+                    var leaves = _mapper.Map<IEnumerable<SickLeaveDTO>>(sickLeaves);
+                    foreach (var leave in leaves)
+                    {
+                        var user = await _accoutnService.FindById(leave.UserID);
+                        leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    }
+                    return Ok(leaves);
                 }
 
                 return NotFound("No sick leaves found for the given user ID and year.");
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while retrieving sick leaves.");
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpGet("GetAllWaitingSickLeaves")]
-        public IActionResult GetAllWaitingSickLeaves()
+        public async Task<IActionResult> GetAllWaitingSickLeaves()
         {
             try
             {
-                var waitingSickLeaves = _base.GetAll(s => s.RespononseDone == false).ToList();
+                var waitingSickLeaves = await _base.GetAll(s => s.RespononseDone == false);
 
                 if (waitingSickLeaves.Any())
                 {
-                    return Ok(waitingSickLeaves);
+                    var leaves = _mapper.Map<IEnumerable<SickLeaveDTO>>(waitingSickLeaves);
+                    foreach (var leave in leaves)
+                    {
+                        var user = await _accoutnService.FindById(leave.UserID);
+                        leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    }
+                    return Ok(leaves);
                 }
 
                 return NotFound("No waiting sick leaves found.");
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while retrieving waiting sick leaves.");
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpPost("CreateSickLeave")]
-        public IActionResult CreateSickLeave([FromBody]CreateSickLeaveDTO model)
+        public async Task<IActionResult> CreateSickLeave([FromBody]CreateSickLeaveDTO model)
         {
             try
             {
@@ -137,18 +174,23 @@ namespace Agazaty.Controllers
                 }
 
                 SickLeave sickLeave = _mapper.Map<SickLeave>(model);
+                sickLeave.Year = model.RequestDate.Year;
 
-                _base.Add(sickLeave);
-                return CreatedAtAction(nameof(CreateSickLeave), new { id = sickLeave.Id }, sickLeave);
+                await _base.Add(sickLeave);
+
+                var leave = _mapper.Map<SickLeaveDTO>(sickLeave);
+                var user = await _accoutnService.FindById(leave.UserID);
+                leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                return CreatedAtAction(nameof(GetSickLeaveById), new { leaveID = sickLeave.Id }, leave);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred.");
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPut("UpdateMedicalCommiteAddressResponse/{leaveID:int}/{address}")]
-        public IActionResult UpdateMedicalCommiteAddressResponse(int leaveID, string address)
+        public async Task<IActionResult> UpdateMedicalCommiteAddressResponse(int leaveID, string address)
         {
             if (leaveID <= 0 || string.IsNullOrWhiteSpace(address))
             {
@@ -162,7 +204,7 @@ namespace Agazaty.Controllers
                     return BadRequest(ModelState);
                 }
 
-                var sickLeave = _base.Get(s => s.Id == leaveID);
+                var sickLeave = await _base.Get(s => s.Id == leaveID);
 
                 if (sickLeave == null)
                 {
@@ -173,20 +215,26 @@ namespace Agazaty.Controllers
                 sickLeave.MedicalCommitteAddress = address;
                 sickLeave.RespononseDone = true;
 
-                _base.Update(sickLeave);
+                var leave = _mapper.Map<SickLeaveDTO>(sickLeave);
+                var user = await _accoutnService.FindById(leave.UserID);
+                leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                await _base.Update(sickLeave);
 
-                return Ok("Medical committee address updated and response marked as done.");
+                return Ok(new { Message = "Medical committee address updated and response marked as done.", Leave = leave });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while updating the sick leave request.");
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPut("UpdateSickLeave/{leaveID}")]
-        public IActionResult UpdateSickLeave(int leaveID, [FromBody]UpdateSickLeaveDTO model)
+        public async Task<IActionResult> UpdateSickLeave(int leaveID, [FromBody]UpdateSickLeaveDTO model)
         {
-
+            if (leaveID <= 0)
+            {
+                return BadRequest("Invalid leave ID or address.");
+            }
             try
             {
                 if (model == null)
@@ -198,47 +246,48 @@ namespace Agazaty.Controllers
                     return BadRequest(ModelState);
                 }
 
-                var sickleave = _base.Get(s => s.Id == leaveID);
+                var sickleave = await _base.Get(s => s.Id == leaveID);
 
                 if (sickleave == null)
                 {
                     return NotFound("SickLeave not found.");
                 }
 
-                //sickleave = _mapper.Map<SickLeave>(model);
-                sickleave.Disease = model.Disease;
-                sickleave.EmployeeAddress = model.EmployeeAddress;
+                _mapper.Map(model, sickleave);
 
-                _base.Update(sickleave);
+                await _base.Update(sickleave);
 
-                return Ok(sickleave);
+                var leave = _mapper.Map<SickLeaveDTO>(sickleave);
+                var user = await _accoutnService.FindById(leave.UserID);
+                leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                return Ok(new { Message = "Update is succeeded.", Leave = leave });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while updating the sick leave.");
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpDelete("DeleteSickLeave/{leaveID}")]
-        public IActionResult DeleteSickLeave(int leaveID)
+        public async Task<IActionResult> DeleteSickLeave(int leaveID)
         {
             if (leaveID <= 0)
                 return BadRequest(new { message = "Invalid leave ID." });
             try
             {
-                var sickleave = _base.Get(s => s.Id == leaveID);
+                var sickleave = await _base.Get(s => s.Id == leaveID);
 
                 if (sickleave == null)
                 {
                     return NotFound("Sick leave not found.");
                 }
 
-                _base.Remove(sickleave);
-                return Ok($"Sick leave {sickleave.Id} for user {sickleave.UserID} has been deleted.");
+                await _base.Remove(sickleave);
+                return Ok($"Sick leave has been deleted successfully.");
             }
             catch (Exception ex)
             {
-                return StatusCode(500, "An error occurred while deleting the sick leave.");
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
     }

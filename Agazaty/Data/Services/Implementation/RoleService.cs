@@ -18,14 +18,24 @@ namespace Agazaty.Data.Services.Implementation
         {
             return await _roleManager.FindByIdAsync(id);
         }
+        public async Task<IdentityRole> FindByName(string RoleName)
+        {
+            return await _roleManager.FindByNameAsync(RoleName);
+        }
         public async Task<IEnumerable<IdentityRole>> GetAllRoles()
         {
             return _roleManager.Roles;
         }
+        public async Task<bool> IsRoleExisted(string RoleName)
+        {
+            var res = await _roleManager.RoleExistsAsync(RoleName);
+            return res;
+        }
         public async Task<IdentityResult> CreateRole(CreateRoleDTO model)
         {
             IdentityRole role = _mapper.Map<IdentityRole>(model);   
-            return await _roleManager.CreateAsync(role);
+            var res = await _roleManager.CreateAsync(role);
+            return res;
         }
         public async Task<IdentityResult> UpdateRole(IdentityRole role)
         {

@@ -1,4 +1,5 @@
 ﻿using Agazaty.Data.Base;
+using Agazaty.Data.DTOs.CasualLeaveDTOs;
 using Agazaty.Data.DTOs.NormalLeaveDTOs;
 using Agazaty.Data.Enums;
 using Agazaty.Data.Services.Interfaces;
@@ -20,90 +21,191 @@ namespace Agazaty.Controllers
         private readonly IEntityBaseRepository<NormalLeave> _base;
         private readonly IAccountService _accountService;
         private readonly IEntityBaseRepository<Department> _departmentBase;
-        private readonly IEntityBaseRepository<DepartmentsManagers> _baseDepartmentsManagers;
         private readonly IMapper _mapper;
         private readonly AppDbContext _appDbContext;
-        public NormalLeaveController(AppDbContext appDbContext, IEntityBaseRepository<NormalLeave> Ebase, IAccountService accountService, IMapper mapper, IEntityBaseRepository<Department> departmentBase, IEntityBaseRepository<DepartmentsManagers> baseDepartmentsManagers)
+        public NormalLeaveController(AppDbContext appDbContext, IEntityBaseRepository<NormalLeave> Ebase, IAccountService accountService, IMapper mapper, IEntityBaseRepository<Department> departmentBase)
         {
             _base = Ebase;
             _accountService = accountService;
             _mapper = mapper;   
             _appDbContext = appDbContext;
             _departmentBase = departmentBase;
-            _baseDepartmentsManagers = baseDepartmentsManagers;
         }
-        [Authorize]
+        //[Authorize]
         [HttpGet("GetNormalLeaveById/{leaveID:int}")]
-        public IActionResult GetNormalLeaveById(int leaveID)
+        public async Task<IActionResult> GetNormalLeaveById(int leaveID)
         {
             if (leaveID <= 0)
                 return BadRequest(new { message = "Invalid leave ID." });
             try
             {
 
-                var NormalLeave = _base.Get(n => n.ID == leaveID);
+                var NormalLeave = await _base.Get(n => n.ID == leaveID);
                 if (NormalLeave == null)
                 {
-                    return NotFound(new { message = $"No normal leave found for this leave ID {leaveID}." });
+                    return NotFound(new { message = "No normal leave found." });
                 }
-                return Ok(NormalLeave);
+
+                var leave = _mapper.Map<NormalLeaveDTO>(NormalLeave);
+                var user = await _accountService.FindById(NormalLeave.UserID);
+                var coworker = await _accountService.FindById(NormalLeave.Coworker_ID);
+                var generalManager = await _accountService.FindById(NormalLeave.General_ManagerID); ;
+                var directManager = await _accountService.FindById(NormalLeave.Direct_ManagerID); 
+                leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
+                return Ok(leave);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
+        //[Authorize]
+        [HttpGet("GetAllAcceptedNormalLeaves")]
+        public async Task<IActionResult> GetAllAcceptedNormalLeaves()
+        {
+            try
+            {
 
-        // GetNormalLeaveByIdAndUserId
+                var NormalLeaves = await _base.GetAll(n => n.Accepted == true && n.ResponseDone == true);
+                if (!NormalLeaves.Any())
+                {
+                    return NotFound(new { message = "No accepted normal leaves found." });
+                }
+                var leaves = new List<NormalLeaveDTO>();
+                foreach (var normalleave in NormalLeaves)
+                {
+                    var leave = _mapper.Map<NormalLeaveDTO>(normalleave);
+                    var user = await _accountService.FindById(normalleave.UserID);
+                    var coworker = await _accountService.FindById(normalleave.Coworker_ID);
+                    var generalManager = await _accountService.FindById(normalleave.General_ManagerID); ;
+                    var directManager = await _accountService.FindById(normalleave.Direct_ManagerID);
+                    leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                    leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
 
-        [Authorize]
+                    leaves.Add(leave);
+                }
+                return Ok(leaves);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+            }
+        }
+        //[Authorize]
+        [HttpGet("GetAllRejectedNormalLeaves")]
+        public async Task<IActionResult> GetAllRejectedNormalLeaves()
+        {
+            try
+            {
+                var NormalLeaves = await _base.GetAll(n => n.Accepted == false && n.ResponseDone == true);
+                if (!NormalLeaves.Any())
+                {
+                    return NotFound(new { message = "No rejected normal leaves found." });
+                }
+                var leaves = new List<NormalLeaveDTO>();
+                foreach (var normalleave in NormalLeaves)
+                {
+                    var leave = _mapper.Map<NormalLeaveDTO>(normalleave);
+                    var user = await _accountService.FindById(normalleave.UserID);
+                    var coworker = await _accountService.FindById(normalleave.Coworker_ID);
+                    var generalManager = await _accountService.FindById(normalleave.General_ManagerID); ;
+                    var directManager = await _accountService.FindById(normalleave.Direct_ManagerID);
+                    leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                    leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
+
+                    leaves.Add(leave);
+                }
+                return Ok(leaves);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+            }
+        }
+        //[Authorize]
         [HttpGet("AllNormalLeavesByUserId/{userID}")]
-        public IActionResult GetAllNormalLeavesByUserID(string userID)
+        public async Task<IActionResult> GetAllNormalLeavesByUserID(string userID)
         {
             if (string.IsNullOrWhiteSpace(userID))
                 return BadRequest(new { message = "Invalid user ID." });
             try
             {
 
-                var NormalLeaves = _base.GetAll(n => n.UserID == userID).ToList();
-                if (NormalLeaves.Count == 0)
+                var NormalLeaves = await _base.GetAll(n => n.UserID == userID);
+                if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = $"No normal leaves found for this User ID {userID}." });
+                    return NotFound(new { message = "No normal leaves found." });
                 }
-                return Ok(NormalLeaves);
+                var leaves = new List<NormalLeaveDTO>();
+                foreach (var normalleave in NormalLeaves)
+                {
+                    var leave = _mapper.Map<NormalLeaveDTO>(normalleave);
+                    var user = await _accountService.FindById(normalleave.UserID);
+                    var coworker = await _accountService.FindById(normalleave.Coworker_ID);
+                    var generalManager = await _accountService.FindById(normalleave.General_ManagerID); ;
+                    var directManager = await _accountService.FindById(normalleave.Direct_ManagerID);
+                    leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                    leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
+
+                    leaves.Add(leave);
+                }
+                return Ok(leaves);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpGet("AcceptedByUserId/{userID}")]
-        public IActionResult GetAllAcceptedNormalLeavesByUserID(string userID)
+        public async Task<IActionResult> GetAllAcceptedNormalLeavesByUserID(string userID)
         {
             if (string.IsNullOrWhiteSpace(userID))
                 return BadRequest(new { message = "Invalid user ID." });
             try
             {
 
-                var NormalLeaves = _base.GetAll(n => n.UserID == userID &&
+                var NormalLeaves = await _base.GetAll(n => n.UserID == userID &&
                     n.Accepted == true &&
-                    n.ResponseDone == true)
-                    .ToList();
-                if (NormalLeaves.Count == 0)
+                    n.ResponseDone == true);
+                if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = $"No accepted normal leaves found for this User ID {userID}." });
+                    return NotFound(new { message = "No accepted normal leaves found." });
                 }
-                return Ok(NormalLeaves);
+                var leaves = new List<NormalLeaveDTO>();
+                foreach (var normalleave in NormalLeaves)
+                {
+                    var leave = _mapper.Map<NormalLeaveDTO>(normalleave);
+                    var user = await _accountService.FindById(normalleave.UserID);
+                    var coworker = await _accountService.FindById(normalleave.Coworker_ID);
+                    var generalManager = await _accountService.FindById(normalleave.General_ManagerID); ;
+                    var directManager = await _accountService.FindById(normalleave.Direct_ManagerID);
+                    leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                    leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
+
+                    leaves.Add(leave);
+                }
+                return Ok(leaves);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpGet("AcceptedByUserIdAndYear/{userID}/{year:int}")]
-        public IActionResult GetAllAcceptedNormalLeavesByUserIDAndYear(string userID, int year)
+        public async Task<IActionResult> GetAllAcceptedNormalLeavesByUserIDAndYear(string userID, int year)
         {
             try
             {
@@ -111,171 +213,252 @@ namespace Agazaty.Controllers
                 int currentYear = DateTime.Now.Year;
                 if (string.IsNullOrWhiteSpace(userID))
                     errors.Add("Invalid user ID.");
-                if (year <= 0)
+                if (year < 1900)
                     errors.Add("Invalid year.");
                 else if (year > currentYear)
                     errors.Add($"Year cannot be older than the current year ({currentYear}).");
                 if (errors.Any())
                     return BadRequest(new { messages = errors });
-                var NormalLeaves = _base.GetAll(n =>
+
+                var NormalLeaves = await _base.GetAll(n =>
                     n.UserID == userID &&
                     n.Year == year &&
                     n.Accepted == true &&
-                    n.ResponseDone == true)
-                    .ToList();
-                if (NormalLeaves.Count == 0)
+                    n.ResponseDone == true);
+                if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = $"No accepted normal leaves found for this user ID {userID} in {year}." });
+                    return NotFound(new { message = $"No accepted normal leaves found in {year}." });
                 }
-                return Ok(NormalLeaves);
+                var leaves = new List<NormalLeaveDTO>();
+                foreach (var normalleave in NormalLeaves)
+                {
+                    var leave = _mapper.Map<NormalLeaveDTO>(normalleave);
+                    var user = await _accountService.FindById(normalleave.UserID);
+                    var coworker = await _accountService.FindById(normalleave.Coworker_ID);
+                    var generalManager = await _accountService.FindById(normalleave.General_ManagerID); ;
+                    var directManager = await _accountService.FindById(normalleave.Direct_ManagerID);
+                    leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                    leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
+
+                    leaves.Add(leave);
+                }
+                return Ok(leaves);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpGet("RejectedByUserId/{userID}")]
-        public IActionResult GetAllRejectedNormalLeavesByUserID(string userID)
+        public async Task<IActionResult> GetAllRejectedNormalLeavesByUserID(string userID)
         {
             if (string.IsNullOrWhiteSpace(userID))
                 return BadRequest(new { message = "Invalid user ID." });
             try
             {
 
-                var NormalLeaves = _base.GetAll(n =>
+                var NormalLeaves = await _base.GetAll(n =>
                     n.UserID == userID &&
                     n.Accepted == false &&
-                    n.ResponseDone == true)
-                    .ToList();
-                if (NormalLeaves.Count == 0)
+                    n.ResponseDone == true);
+                if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = $"No rejected normal leaves found for this User ID {userID}." });
+                    return NotFound(new { message = "No rejected normal leaves found." });
                 }
-                return Ok(NormalLeaves);
+                var leaves = new List<NormalLeaveDTO>();
+                foreach (var normalleave in NormalLeaves)
+                {
+                    var leave = _mapper.Map<NormalLeaveDTO>(normalleave);
+                    var user = await _accountService.FindById(normalleave.UserID);
+                    var coworker = await _accountService.FindById(normalleave.Coworker_ID);
+                    var generalManager = await _accountService.FindById(normalleave.General_ManagerID); ;
+                    var directManager = await _accountService.FindById(normalleave.Direct_ManagerID);
+                    leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                    leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
+
+                    leaves.Add(leave);
+                }
+                return Ok(leaves);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpGet("WaitingByUserID/{userID}")]
-        public IActionResult GetAllWaitingNormalLeavesByUserID(string userID)
+        public async Task<IActionResult> GetAllWaitingNormalLeavesByUserID(string userID)
         {
             if (string.IsNullOrWhiteSpace(userID))
                 return BadRequest(new { message = "Invalid user ID." });
             try
             {
 
-                var NormalLeaves = _base.GetAll(n =>
+                var NormalLeaves = await _base.GetAll(n =>
                     n.UserID == userID &&
-                    n.ResponseDone == false)
-                    .ToList();
-                if (NormalLeaves.Count == 0)
+                    n.ResponseDone == false);
+                if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = $"No waiting normal leaves found for this User ID {userID}." });
+                    return NotFound(new { message = "No waiting normal leaves found." });
                 }
-                return Ok(NormalLeaves);
+
+                var leaves = new List<NormalLeaveDTO>();
+                foreach (var normalleave in NormalLeaves)
+                {
+                    var leave = _mapper.Map<NormalLeaveDTO>(normalleave);
+                    var user = await _accountService.FindById(normalleave.UserID);
+                    var coworker = await _accountService.FindById(normalleave.Coworker_ID);
+                    var generalManager = await _accountService.FindById(normalleave.General_ManagerID); ;
+                    var directManager = await _accountService.FindById(normalleave.Direct_ManagerID);
+                    leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                    leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
+
+                    leaves.Add(leave);
+                }
+                return Ok(leaves);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية")]
         [HttpGet("WaitingByGeneral_ManagerID/{general_managerID}")]
-        public IActionResult GetAllWaitingNormalLeavesByGeneral_ManagerID(string general_managerID)
+        public async Task<IActionResult> GetAllWaitingNormalLeavesByGeneral_ManagerID(string general_managerID)
         {
             if (string.IsNullOrWhiteSpace(general_managerID))
                 return BadRequest(new { message = "Invalid general manager ID." });
             try
             {
 
-                var NormalLeaves = _base.GetAll(n =>
+                var NormalLeaves = await _base.GetAll(n =>
                     n.General_ManagerID == general_managerID &&
-                    n.GeneralManager_Decision == false &&
+                    n.GeneralManager_Decision==false &&
                     n.DirectManager_Decision == true &&
                     n.CoWorker_Decision == true &&
-                    n.ResponseDone == false)
-                    .ToList();
-                if (NormalLeaves.Count == 0)
+                    n.ResponseDone == false);
+                if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = $"No waiting normal leaves found for this general manager id {general_managerID}." });
+                    return NotFound(new { message = "No waiting normal leaves found." });
                 }
-                return Ok(NormalLeaves);
+
+                var leaves = new List<NormalLeaveDTO>();
+                foreach (var normalleave in NormalLeaves)
+                {
+                    var leave = _mapper.Map<NormalLeaveDTO>(normalleave);
+                    var user = await _accountService.FindById(normalleave.UserID);
+                    var coworker = await _accountService.FindById(normalleave.Coworker_ID);
+                    var generalManager = await _accountService.FindById(normalleave.General_ManagerID); ;
+                    var directManager = await _accountService.FindById(normalleave.Direct_ManagerID);
+                    leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                    leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
+
+                    leaves.Add(leave);
+                }
+                return Ok(leaves);
+                //return Ok(_mapper.Map<IEnumerable<NormalLeaveDTO>>(NormalLeaves));
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpGet("WaitingByDirect_ManagerID/{direct_managerID}")]
-        public IActionResult GetAllWaitingNormalLeavesByDirect_ManagerID(string direct_managerID)
+        public async Task<IActionResult> GetAllWaitingNormalLeavesByDirect_ManagerID(string direct_managerID)
         {
             if (string.IsNullOrWhiteSpace(direct_managerID))
                 return BadRequest(new { message = "Invalid direct manager ID." });
             try
             {
 
-                var NormalLeaves = _base.GetAll(n =>
+                var NormalLeaves = await _base.GetAll(n =>
                     n.Direct_ManagerID == direct_managerID &&
-                    n.DirectManager_Decision == false &&
+                    n.DirectManager_Decision==false &&
                     n.CoWorker_Decision == true &&
-                    n.ResponseDone == false)
-                    .ToList();
-                if (NormalLeaves.Count == 0)
+                    n.ResponseDone == false);
+                if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = $"No waiting normal leaves found for this direct manager id {direct_managerID}." });
+                    return NotFound(new { message = "No waiting normal leaves found." });
                 }
-                return Ok(NormalLeaves);
+
+                var leaves = new List<NormalLeaveDTO>();
+                foreach (var normalleave in NormalLeaves)
+                {
+                    var leave = _mapper.Map<NormalLeaveDTO>(normalleave);
+                    var user = await _accountService.FindById(normalleave.UserID);
+                    var coworker = await _accountService.FindById(normalleave.Coworker_ID);
+                    var generalManager = await _accountService.FindById(normalleave.General_ManagerID); ;
+                    var directManager = await _accountService.FindById(normalleave.Direct_ManagerID);
+                    leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                    leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
+
+                    leaves.Add(leave);
+                }
+                return Ok(leaves);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpGet("WaitingByCoWorkerID/{coworkerID}")]
-        public IActionResult GetAllWaitingNormalLeavesByCoWorkerID(string coworkerID)
+        public async Task<IActionResult> GetAllWaitingNormalLeavesByCoWorkerID(string coworkerID)
         {
             if (string.IsNullOrWhiteSpace(coworkerID))
                 return BadRequest(new { message = "Invalid coworker ID." });
             try
             {
 
-                var NormalLeaves = _base.GetAll(n =>
+                var NormalLeaves = await _base.GetAll(n =>
                     n.Coworker_ID == coworkerID &&
-                    n.CoWorker_Decision == false &&
-                    n.ResponseDone == false)
-                    .ToList();
-                if (NormalLeaves.Count == 0)
+                    n.ResponseDone == false && n.CoWorker_Decision==false);
+                if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = $"No waiting normal leaves found for this coworker id {coworkerID}." });
+                    return NotFound(new { message = "No waiting normal leaves found." });
                 }
-                return Ok(NormalLeaves);
+
+                var leaves = new List<NormalLeaveDTO>();
+                foreach (var normalleave in NormalLeaves)
+                {
+                    var leave = _mapper.Map<NormalLeaveDTO>(normalleave);
+                    var user = await _accountService.FindById(normalleave.UserID);
+                    var coworker = await _accountService.FindById(normalleave.Coworker_ID);
+                    var generalManager = await _accountService.FindById(normalleave.General_ManagerID); ;
+                    var directManager = await _accountService.FindById(normalleave.Direct_ManagerID);
+                    leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                    leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
+
+                    leaves.Add(leave);
+                }
+                return Ok(leaves);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية,هيئة تدريس,موظفين")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية,هيئة تدريس,موظفين")]
         [HttpGet("GetLeaveTypes")]
-        public IActionResult GetLeaveTypes()
+        public async Task<IActionResult> GetLeaveTypes()
         {
-            //var leaveTypes = Enum.GetValues(typeof(LeaveTypes.Leaves)).Cast<LeaveTypes.Leaves>();
             return Ok(LeaveTypes.res);
         }
-        [Authorize]
-        [HttpGet("NormalLeaveRequestNeededData")]
-        public IActionResult NormalLeaveRequestNeededData()
-        {
-            var coworkers = _accountService.GetAllUsers();
-            return Ok(coworkers);
-        }
-        [Authorize]
+        //[Authorize]
         [HttpPost("CreateNormalLeave")]
         public async Task<IActionResult> CreateNormalLeave([FromBody]CreateNormalLeaveDTO model)
         {
@@ -295,9 +478,9 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(new { Message = "Invalid user id or coworker id." });
                 }
-                if ((model.EndDate - model.StartDate).TotalDays > user.CasualLeavesCount)
+                if (((model.EndDate - model.StartDate).TotalDays + 1) > user.CasualLeavesCount)
                 {
-                    return Ok(new { Message = $"The number of days available to you are {user.NormalLeavesCount}" });
+                    return Ok(new { Message = $"You request {((model.EndDate - model.StartDate).TotalDays + 1)} days, but the number of days available to you are {user.NormalLeavesCount}" });
                 }
 
                 var errors = new List<string>();
@@ -343,56 +526,70 @@ namespace Agazaty.Controllers
                 normalLeave.LeaveStatus = LeaveStatus.Waiting;
                 normalLeave.Holder = Holder.CoWorker;
                 normalLeave.RejectedBy = RejectedBy.NotRejected;
-                if (await _accountService.IsInRoleAsync(user, "Staff"))
+                if (await _accountService.IsInRoleAsync(user, "هيئة تدريس"))
                 {
-                    var res = await _accountService.GetAllUsersInRole("Dean");
+                    var res = await _accountService.GetAllUsersInRole("عميد الكلية");
                     var Dean = res.FirstOrDefault();
+                    if(Dean == null) { return BadRequest( new { Message = "There no user with the Dean role" });  }
                     normalLeave.General_ManagerID = Dean.Id;
 
-                    //var dept = _departmentBase.Get(d => d.Id == user.Departement_ID);
-                    //var DepartmentHead = _accountService.FindByNationalId(dept.ManagerNationalNumber);
-                    var DepartmentHeadID = _baseDepartmentsManagers.Get(dm => dm.departmentId == user.Departement_ID).managerid;
-                    normalLeave.Direct_ManagerID = DepartmentHeadID;
+                    var DepartmentofUser = await _departmentBase.Get(dm => dm.Id == user.Departement_ID);
+                    if(DepartmentofUser==null) { return BadRequest(new { Message = "This user doesn't have a department." });  }
+                    normalLeave.Direct_ManagerID = DepartmentofUser.ManagerId;
                 }
-                else if(await _accountService.IsInRoleAsync(user, "Employee"))
+                else if(await _accountService.IsInRoleAsync(user, "موظف"))
                 {
-                    var res = await _accountService.GetAllUsersInRole("Supervisor");
-                    var Dean = res.FirstOrDefault();
-                    normalLeave.General_ManagerID = res.FirstOrDefault().Id;
+                    var res = await _accountService.GetAllUsersInRole("أمين الكلية");
+                    var Supervisor = res.FirstOrDefault();
+                    if (Supervisor == null) { return BadRequest(new { Message = "There no user with the Supervisor role" }); }
+                    normalLeave.General_ManagerID = Supervisor.Id;
 
-                    //var dept = _departmentBase.Get(d => d.Id == user.Departement_ID);
-                    //var DepartmentHead = _accountService.FindByNationalId(dept.ManagerNationalNumber);
-                    var DepartmentHeadID = _baseDepartmentsManagers.Get(dm => dm.departmentId == user.Departement_ID).managerid;
-                    normalLeave.Direct_ManagerID = DepartmentHeadID;
+                    var DepartmentofUser = await _departmentBase.Get(dm => dm.Id == user.Departement_ID);
+                    if (DepartmentofUser == null) { return BadRequest(new { Message = "This user doesn't have a department." }); }
+                    normalLeave.Direct_ManagerID = DepartmentofUser.ManagerId;
                 }
-                else if(await _accountService.IsInRoleAsync(user, "Supervisor"))
+                else if(await _accountService.IsInRoleAsync(user, "أمين الكلية"))
                 {
                     // if أمين الكلية made a leave request
-                    var res = await _accountService.GetAllUsersInRole("Dean");
+                    var res = await _accountService.GetAllUsersInRole("عميد الكلية");
                     var Dean = res.FirstOrDefault();
+                    if (Dean == null) { return BadRequest(new { Message = "There no user with the Dean role" }); }
                     normalLeave.General_ManagerID = Dean.Id;
                     normalLeave.Direct_ManagerID = Dean.Id;
                 }
-                else if (await _accountService.IsInRoleAsync(user, "HR"))
+                else if (await _accountService.IsInRoleAsync(user, "مدير الموارد البشرية"))
                 {
-                    var res = await _accountService.GetAllUsersInRole("Supervisor");
-                    var super = res.FirstOrDefault();
-                    normalLeave.General_ManagerID = super.Id;
-                    normalLeave.Direct_ManagerID = super.Id;
+                    var res = await _accountService.GetAllUsersInRole("أمين الكلية");
+                    var Supervisor = res.FirstOrDefault();
+                    if (Supervisor == null) { return BadRequest(new { Message = "There no user with the Supervisor role" }); }
+                    normalLeave.General_ManagerID = Supervisor.Id;
+                    normalLeave.Direct_ManagerID = Supervisor.Id;
                 }
-                _base.Add(normalLeave);
+                await _base.Add(normalLeave);
 
-                return CreatedAtAction(nameof(GetNormalLeaveById), new { leaveID = normalLeave.ID }, normalLeave);
+
+                var leave = _mapper.Map<NormalLeaveDTO>(normalLeave);
+                var coworker = await _accountService.FindById(normalLeave.Coworker_ID);
+                var generalManager = await _accountService.FindById(normalLeave.General_ManagerID); ;
+                var directManager = await _accountService.FindById(normalLeave.Direct_ManagerID);
+                leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
+                return CreatedAtAction(nameof(GetNormalLeaveById), new { leaveID = normalLeave.ID }, leave);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPut("UpdateNormalLeave/{leaveID:int}")]
         public async Task<IActionResult> UpdateNormalLeave(int leaveID, [FromBody] UpdateNormalLeaveDTO model)
         {
+            if (leaveID <= 0)
+                return BadRequest(new { message = "Invalid leave ID." });
+
             try
             {
                 if (model == null)
@@ -404,7 +601,7 @@ namespace Agazaty.Controllers
                     return BadRequest(ModelState);
                 }
 
-                var NormalLeave = _base.Get(n =>
+                var NormalLeave = await _base.Get(n =>
                     n.ID == leaveID &&
                     n.ResponseDone == true &&
                     n.Accepted == true
@@ -426,27 +623,27 @@ namespace Agazaty.Controllers
                 if (errors.Any())
                     return BadRequest(new { messages = errors });
                 // Update properties
-                ApplicationUser user = await _accountService.FindById(NormalLeave.UserID);
-                if ((model.EndDate - NormalLeave.StartDate).TotalDays > user.CasualLeavesCount)
-                {
-                    return Ok(new { Message = $"The number of days available to you are {user.NormalLeavesCount}" });
-                }
+                var user = await _accountService.FindById(NormalLeave.UserID);
 
-                //NormalLeave = _mapper.Map<NormalLeave>(model);
                 NormalLeave.NotesFromEmployee = model.NotesFromEmployee;
-                user.NormalLeavesCount += (NormalLeave.EndDate - model.EndDate).TotalDays;
+                user.NormalLeavesCount += ((NormalLeave.EndDate - model.EndDate).TotalDays + 1);
                 NormalLeave.EndDate = model.EndDate;
 
-                _base.Update(NormalLeave);
+                await _base.Update(NormalLeave);
+
+                var leave = _mapper.Map<NormalLeaveDTO>(NormalLeave);
+                var coworker = await _accountService.FindById(NormalLeave.Coworker_ID);
+                var generalManager = await _accountService.FindById(NormalLeave.General_ManagerID); ;
+                var directManager = await _accountService.FindById(NormalLeave.Direct_ManagerID);
+                leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
 
                 return Ok(new
                 {
                     message = "Normal Leave updated successfully",
-                    leaveID = NormalLeave.ID,
-                    userID = NormalLeave.UserID,
-                    newEndDate = NormalLeave.EndDate,
-                    notes = NormalLeave.NotesFromEmployee
-                    //update number of Normal leaves's user 
+                    Leave = leave
                 });
             }
             catch (Exception ex)
@@ -455,10 +652,13 @@ namespace Agazaty.Controllers
             }
 
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية")]
         [HttpPut("UpdateGeneralManagerDecision/{leaveID:int}")]
         public async Task<IActionResult> UpdateGeneralManagerDecision(int leaveID, [FromBody] GeneralManagerDecisionDTO model)
         {
+            if (leaveID <= 0)
+                return BadRequest(new { message = "Invalid leave ID." });
+
             try
             {
                 if (model == null)
@@ -469,10 +669,11 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(ModelState);
                 }
-                var NormalLeave = _base.Get(n =>
+                var NormalLeave = await _base.Get(n =>
                     n.ID == leaveID &&
                     n.CoWorker_Decision == true &&
                     n.DirectManager_Decision == true &&
+                    n.Accepted == false &&
                     n.ResponseDone == false
                     );
 
@@ -480,14 +681,14 @@ namespace Agazaty.Controllers
                 {
                     return NotFound(new { message = "Normal Leave not found or not eligible for update" });
                 }
-                ApplicationUser user = await _accountService.FindById(NormalLeave.UserID);
+                var user = await _accountService.FindById(NormalLeave.UserID);
                 // Update properties
                 NormalLeave.GeneralManager_Decision = model.GeneralManagerDecision;
                 NormalLeave.ResponseDone = true;
                 if (model.GeneralManagerDecision == true)
                 {
                     NormalLeave.Accepted = true;
-                    user.NormalLeavesCount -= (NormalLeave.EndDate - NormalLeave.StartDate).TotalDays;
+                    user.NormalLeavesCount -= ((NormalLeave.EndDate - NormalLeave.StartDate).TotalDays + 1);
                     NormalLeave.LeaveStatus = LeaveStatus.Accepted;
                     NormalLeave.Holder = Holder.NotWaiting;
                 }
@@ -499,15 +700,21 @@ namespace Agazaty.Controllers
                     NormalLeave.Holder = Holder.NotWaiting;
                 }
 
-                _base.Update(NormalLeave);
+                await _base.Update(NormalLeave);
+
+                var leave = _mapper.Map<NormalLeaveDTO>(NormalLeave);
+                var coworker = await _accountService.FindById(NormalLeave.Coworker_ID);
+                var generalManager = await _accountService.FindById(NormalLeave.General_ManagerID); ;
+                var directManager = await _accountService.FindById(NormalLeave.Direct_ManagerID);
+                leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
 
                 return Ok(new
                 {
                     message = "General manager decision updated successfully",
-                    leaveID = NormalLeave.ID,
-                    userID = NormalLeave.UserID,
-                    accepted = NormalLeave.Accepted,
-                    disapproveReason = NormalLeave.DisapproveReasonOfGeneral_Manager
+                    Leave = leave
                 });
             }
             catch (Exception ex)
@@ -515,10 +722,13 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
             }     
         }
-        [Authorize]
+        //[Authorize]
         [HttpPut(("UpdateDirectManagerDecision/{leaveID:int}"))]
-        public IActionResult UpdateDirectManagerDecision(int leaveID, [FromBody] DirectManagerDecisionDTO model)
+        public async Task<IActionResult> UpdateDirectManagerDecision(int leaveID, [FromBody] DirectManagerDecisionDTO model)
         {
+            if (leaveID <= 0)
+                return BadRequest(new { message = "Invalid leave ID." });
+
             try
             {
                 if (!ModelState.IsValid)
@@ -526,9 +736,12 @@ namespace Agazaty.Controllers
                     return BadRequest(ModelState);
                 }
 
-                var NormalLeave = _base.Get(n =>
+                var NormalLeave = await _base.Get(n =>
                     n.ID == leaveID &&
                     n.ResponseDone == false &&
+                    n.Accepted == false &&
+                    n.DirectManager_Decision == false &&
+                    n.GeneralManager_Decision == false &&
                     n.CoWorker_Decision == true);
 
                 if (NormalLeave == null)
@@ -552,15 +765,22 @@ namespace Agazaty.Controllers
                     NormalLeave.Holder = Holder.GeneralManager;
                 }
 
-                _base.Update(NormalLeave);
+                await _base.Update(NormalLeave);
+
+                var leave = _mapper.Map<NormalLeaveDTO>(NormalLeave);
+                var user = await _accountService.FindById(NormalLeave.UserID);
+                var coworker = await _accountService.FindById(NormalLeave.Coworker_ID);
+                var generalManager = await _accountService.FindById(NormalLeave.General_ManagerID); ;
+                var directManager = await _accountService.FindById(NormalLeave.Direct_ManagerID);
+                leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
 
                 return Ok(new
                 {
                     message = "Direct Manager decision updated successfully.",
-                    leaveID = NormalLeave.ID,
-                    userID = NormalLeave.UserID,
-                    directManagerDecision = NormalLeave.DirectManager_Decision,
-                    responseDone = NormalLeave.ResponseDone
+                    Leave = leave
                 });
             }
             catch (Exception ex)
@@ -568,15 +788,21 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
             }    
         }
-        [Authorize]
+        //[Authorize]
         [HttpPut("UpdateCoworkerDecision/{leaveID:int}")]
         public async Task<IActionResult> UpdateCoworkerDecision([FromRoute]int leaveID, [FromQuery]bool CoworkerDecision)
         {
+            if (leaveID <= 0)
+                return BadRequest(new { message = "Invalid leave ID." });
+
             try
             {
-                var NormalLeave = _base.Get(n =>
+                var NormalLeave = await _base.Get(n =>
                     n.ID == leaveID &&
-                    n.ResponseDone == false);
+                    n.ResponseDone == false &&
+                    n.DirectManager_Decision == false &&
+                    n.GeneralManager_Decision == false &&
+                    n.Accepted == false);
 
                 if (NormalLeave == null)
                 {
@@ -599,33 +825,40 @@ namespace Agazaty.Controllers
 
                     // if Head of Departement made a leave request
                     // if أمين الكلية made a leave request
-                    var user = await _accountService.FindById(NormalLeave.UserID);
-                    var IsdeptManager = _baseDepartmentsManagers.Get(d => d.managerid == user.Id);
-                    bool cheackRole = await _accountService.IsInRoleAsync(user, "أمين الكلية");
+                    var userr = await _accountService.FindById(NormalLeave.UserID);
+                    var IsdeptManager = await _departmentBase.Get(d => d.ManagerId == userr.Id);
+                    bool cheackRole = await _accountService.IsInRoleAsync(userr, "أمين الكلية");
                     if (cheackRole || IsdeptManager != null)
                         NormalLeave.DirectManager_Decision = true;
                 }
 
 
-                _base.Update(NormalLeave);  
+                await _base.Update(NormalLeave);
+
+                var leave = _mapper.Map<NormalLeaveDTO>(NormalLeave);
+                var user = await _accountService.FindById(NormalLeave.UserID);
+                var coworker = await _accountService.FindById(NormalLeave.Coworker_ID);
+                var generalManager = await _accountService.FindById(NormalLeave.General_ManagerID); ;
+                var directManager = await _accountService.FindById(NormalLeave.Direct_ManagerID);
+                leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
 
                 return Ok(new
                 {
                     message = "Coworker decision updated successfully.",
-                    leaveID = NormalLeave.ID,
-                    userID = NormalLeave.UserID,
-                    coworkerDecision = NormalLeave.CoWorker_Decision,
-                    responseDone = NormalLeave.ResponseDone
+                    Leave = leave
                 });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
             }
-        }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+         }
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpDelete("DeleteNormalLeave/{leaveID}")]
-        public IActionResult DeleteNormalLeave([FromRoute]int leaveID)
+        public async Task<IActionResult> DeleteNormalLeave([FromRoute]int leaveID)
         {
             if (leaveID <= 0)
             {
@@ -633,12 +866,12 @@ namespace Agazaty.Controllers
             }
             try
             {
-                var NormalLeave = _base.Get(n => n.ID == leaveID);
+                var NormalLeave = await _base.Get(n => n.ID == leaveID);
                 if (NormalLeave == null)
                 {
                     return NotFound(new { message = "Normal Leave not found" });
                 }
-                _base.Remove(NormalLeave);
+                await _base.Remove(NormalLeave);
 
                 return Ok(new
                 {

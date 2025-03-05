@@ -3,11 +3,15 @@ using Agazaty.Data.DTOs;
 using Agazaty.Data.DTOs.AccountDTOs;
 using Agazaty.Data.Services.Interfaces;
 using Agazaty.Models;
+using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Data;
+using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
+using System.Text.RegularExpressions;
 
 namespace Agazaty.Controllers
 {
@@ -19,17 +23,37 @@ namespace Agazaty.Controllers
         private readonly IRoleService _roleService;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IEntityBaseRepository<Department> _deptBase;
-        private readonly IEntityBaseRepository<DepartmentsManagers> _baseDepartmentsManagers;
+        private readonly IMapper _mapper;
 
-        public AccountController(IAccountService accountService, SignInManager<ApplicationUser> signInManager, IRoleService roleService, IEntityBaseRepository<Department> deptBase, IEntityBaseRepository<DepartmentsManagers> baseDepartmentsManagers)
+        public AccountController(IMapper mapper, IAccountService accountService, SignInManager<ApplicationUser> signInManager, IRoleService roleService, IEntityBaseRepository<Department> deptBase)
         {
             _accountService = accountService;
             _signInManager = signInManager;
             _roleService = roleService;
             _deptBase = deptBase;
-            _baseDepartmentsManagers = baseDepartmentsManagers;
+            _mapper = mapper;
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية,Dean")]
+        //[Authorize]
+        [HttpPost("Change-Password")]
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDTO model)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var user = await _accountService.FindById(userId);
+            if (user == null)
+                return NotFound("User not found."); 
+
+            var result = await _accountService.ChangePassword(user, model);
+            if (!result.Succeeded)
+            {
+                var errors = result.Errors.Select(e => e.Description).ToList();
+                return BadRequest(new { Errors = errors });
+            }
+            return Ok("Password changed successfully.");
+        }
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية,Dean")]
         [HttpGet("GetUserById/{userID}")]
         public async Task<IActionResult> GetUserById([FromRoute]string userID)
         {
@@ -40,16 +64,24 @@ namespace Agazaty.Controllers
                 var user = await _accountService.FindById(userID);
                 if (user == null)
                 {
-                    return NotFound(new { Message = "User is not found" });
+                    return NotFound(new { Message = "User is not found." });
                 }
-                return Ok(user);
+
+                var ReturnedUser = _mapper.Map<UserDTO>(user);
+                ReturnedUser.FullName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                if (user.Departement_ID != null)
+                {
+                    var dept = await _deptBase.Get(d => d.Id == user.Departement_ID);
+                    ReturnedUser.DepartmentName = dept.Name;
+                }
+                return Ok(ReturnedUser);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetUserByNationalId/{NationalId}")]
         public async Task<IActionResult> GetUserByNationalId(string NationalId)
         {
@@ -57,112 +89,133 @@ namespace Agazaty.Controllers
                 return BadRequest(new { message = "Invalid user ID." });
             try
             {
-                var user = _accountService.FindByNationalId(NationalId);
-                if (user == null) return NotFound(new { Message = "User is not found" });
-                return Ok(user);
+                var user = await _accountService.FindByNationalId(NationalId);
+                if (user == null) return NotFound(new { Message = "User is not found." });
+
+                var ReturnedUser = _mapper.Map<UserDTO>(user);
+                ReturnedUser.FullName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                if (user.Departement_ID != null)
+                {
+                    var dpt = await _deptBase.Get(d => d.Id == user.Departement_ID);
+                    ReturnedUser.DepartmentName = dpt.Name;
+                }
+                return Ok(ReturnedUser);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetAllUsers")]
         public async Task<IActionResult> GetAllUsers()
         {
             try
             {
-                var users = _accountService.GetAllUsers();
-                return Ok(users);
+                var users = await _accountService.GetAllUsers();
+                if (!users.Any()) { return NotFound(new { Message = "There Are No Users Found."}); }
+
+                var ReturnedUsers = _mapper.Map<IEnumerable<UserDTO>>(users);
+                foreach(var ReturnedUser in ReturnedUsers)
+                {
+                    var user = await _accountService.FindById(ReturnedUser.Id);
+                    ReturnedUser.FullName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    if (user.Departement_ID != null)
+                    {
+                        var dpt = await _deptBase.Get(d => d.Id == user.Departement_ID);
+                        ReturnedUser.DepartmentName = dpt.Name;
+                    }
+                }
+                return Ok(ReturnedUsers);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetAllUsersByDepartmentId/{DepartmentId}")]
         public async Task<IActionResult> GetAllUsersByDepartmentId(int DepartmentId)
         {
             if (DepartmentId <= 0)
-                return BadRequest();
+                return BadRequest(new {Message = "Invalid Department Id."});
             try
             {
-                var users = _accountService.GetAllUsersByDepartmentId(DepartmentId);
-                return Ok(users);
+                var dept = await _deptBase.Get(d=>d.Id==DepartmentId);
+                if (dept == null) return NotFound(new { Message = "There is no department found with this id." });
+
+                var users = await _accountService.GetAllUsersByDepartmentId(DepartmentId);
+                if(!users.Any()) return NotFound(new { Message = "There are no users found in this department." });
+
+                var ReturnedUsers = _mapper.Map<IEnumerable<UserDTO>>(users);
+                foreach (var ReturnedUser in ReturnedUsers)
+                {
+                    var user = await _accountService.FindById(ReturnedUser.Id);
+                    ReturnedUser.FullName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    if (user.Departement_ID != null)
+                    {
+                        var dpt = await _deptBase.Get(d => d.Id == user.Departement_ID);
+                        ReturnedUser.DepartmentName = dpt.Name;
+                    }
+                }
+                return Ok(ReturnedUsers);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
-        }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
-        [HttpGet("RegsitrationPageNeededData")]
-        public async  Task<IActionResult> CreateUserRequest()
-        {
-            var depts = _deptBase.GetAll().ToList();
-            var roles = await _roleService.GetAllRoles();
-            CreateUserRequestDTO model = new CreateUserRequestDTO()
-            {
-                Roles = roles,
-                Depts = depts
-            };
-            return Ok(model);
-        }
-        //[HttpGet("LoginPageNeededData")]
-        //public IActionResult Login()
-        //{
-        //    return Ok();
-        //}
+        }        
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpPost("CreateUser/{RoleName}")]
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
-        public async Task<IActionResult> CreateUser([FromRoute]string RoleName, [FromBody] CreateUserDTO model) // Register
+        public async Task<IActionResult> CreateUser([FromRoute]string RoleName, [FromBody] CreateUserDTO model) 
         {
             try
             {
                 if (ModelState.IsValid)
                 {
-                    if(RoleName=="Dean" || RoleName == "Supervisor")
+                    if(RoleName=="عميد الكلية" || RoleName == "أمين الكلية")
                     {
                         var list = await _accountService.GetAllUsersInRole(RoleName);
-                        if (list.Count() > 0) return BadRequest(new { Message = $"There is already user has the {RoleName} role" });
+                        if (list.Any()) return BadRequest(new { Message = $"There is already user has the {RoleName} role, , this role should be only assigned to not more than 1 user." });
                     }
-                    if (model.IsDepartmentManager)
+                    if (await _accountService.FindByEmail(model.Email) is not null)
+                        return BadRequest(new { Message = "Email is already registered!" });
+
+                    if (await _accountService.FindByNationalId(model.NationalID) is not null)
+                        return BadRequest(new { Message = "NationalID is already registered!" });
+
+                    if (await _accountService.FindByName(model.UserName) is not null)
+                        return BadRequest(new { Message = "UserName is already registered!" });
+
+                    if (!await _roleService.IsRoleExisted(RoleName))
+                        return BadRequest(new { Message = "Invalid user ID or Role!" });
+
+                    if (model.Departement_ID != null)
                     {
-                        var entity = _baseDepartmentsManagers.Get(dm => dm.departmentId == model.Departement_ID);
-                        if (entity != null) return BadRequest(new { Message = "This department already has a manager" });
+                        if (await _deptBase.Get(d => d.Id == model.Departement_ID) is null)
+                            return BadRequest(new { Message = "Invalid department!" });
                     }
+
 
                     var res = await _accountService.Create(RoleName,model);
-                    if (res.IsAuthenticated)
+                    if (res.Succeeded)
                     {
-                        ApplicationUser user = _accountService.FindByNationalId(model.NationalID);
-
-                        if (user.IsDepartmentManager)
+                        var user = await _accountService.FindByNationalId(model.NationalID);
+                        var ress = await _accountService.AddUserToRole(user, RoleName);
+                        if (ress.Succeeded)
                         {
-                            DepartmentsManagers DepartmentsManagers = new DepartmentsManagers()
+                            var ReturnedUser = _mapper.Map<UserDTO>(user);
+                            ReturnedUser.FullName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                            if(user.Departement_ID != null)
                             {
-                                managerid = user.Id,
-                                departmentId = (int)user.Departement_ID
-                            };
-                            _baseDepartmentsManagers.Add(DepartmentsManagers);
+                                var dpt = await _deptBase.Get(d => d.Id == user.Departement_ID);
+                                ReturnedUser.DepartmentName = dpt.Name;
+                            }
+                            return CreatedAtAction(nameof(GetUserById), new { userID = user.Id }, ReturnedUser);
                         }
-
-                        var cookieOptions = new CookieOptions()
-                        {
-                            HttpOnly = true,
-                            Expires = DateTime.Now.AddDays(1)
-                        };
-                        Response.Cookies.Append("UserName", user.UserName, cookieOptions);
-                        Response.Cookies.Append("UserId", user.Id, cookieOptions);
-
-
-                        await _accountService.AddUserToRole(user, RoleName);
-                        //await InitalizeLeavesCountOfUser(user.Id);
-                        await _signInManager.SignInAsync(user, false);
-                        return Ok(res);
+                        return BadRequest(ress.Errors);
                     }
-                    return BadRequest(res.Message);
+                    return BadRequest(res.Errors);
                 }
                 return BadRequest(ModelState);
             }
@@ -171,7 +224,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpPost("UserLogin")]
         public async Task<IActionResult> Login([FromBody] LogInUserDTO model)
         {
@@ -179,20 +232,18 @@ namespace Agazaty.Controllers
             {
                 if (ModelState.IsValid)
                 {
-                    
-                    var res = await _accountService.GetTokenAsync(model);
+                    var user = await _accountService.FindByName(model.UserName);
+                    bool checkPassword = await _accountService.CheckPassword(user, model.Password);
+                    if (user is null || !checkPassword)
+                    {
+                        return Unauthorized(new { Message = "User Name or Password is incorrect!" });
+                    }
+
+                    var res = await _accountService.GetTokenAsync(user);
                     if (res.IsAuthenticated)
                     {
-                        ApplicationUser applicationUser = await _accountService.FindByEmail(model.Email);
-                        var cookieOptions = new CookieOptions()
-                        {
-                            Expires = DateTime.Now.AddHours(1),
-                            HttpOnly = true
-                        };
-                        Response.Cookies.Append("UserName", applicationUser.UserName, cookieOptions);
-                        Response.Cookies.Append("UserId", applicationUser.Id, cookieOptions);
-
-                        // Handling leavesCounts
+                        var applicationUser = await _accountService.FindByName(model.UserName);
+                        // Handling leavesCounts in beginning of every year
                         if (DateTime.UtcNow.Month == 7 && applicationUser.IntializationCheck)
                         {
                             await _accountService.InitalizeLeavesCountOfUser(applicationUser.Id);
@@ -202,11 +253,9 @@ namespace Agazaty.Controllers
                         {
                             applicationUser.IntializationCheck = true;
                         }
-
-                        await _signInManager.SignInAsync(applicationUser, false);
                         return Ok(res);
                     }
-                    return Unauthorized(res);
+                    return Unauthorized(new {Message = res.Message});
                 }
                 return BadRequest(ModelState);
             }
@@ -215,111 +264,61 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
-        [HttpPost("UserLogout")]
-        public async Task<IActionResult> Logout()
-        {
-            try
-            {
-                Response.Cookies.Delete("UserName");
-                await _signInManager.SignOutAsync();
-                return Ok(new { Message = "Logout is succeeded" });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
-            }
-        }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
-        [HttpPost("AddUserToRole/{UserId}/{RoleName}")]
-        public async Task<IActionResult> AddUserToRole(string UserId, string RoleName)
-        {
-            if (string.IsNullOrWhiteSpace(UserId) || string.IsNullOrWhiteSpace(RoleName))
-                return BadRequest(new { message = "Invalid UserID or RoleName." });
-            try
-            {
-                var user = await _accountService.FindById(UserId);
-                var res = await _accountService.AddUserToRole(user, RoleName);
-                return Ok(new { Message = res });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
-            }
-        }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpPut("UpdateUser/{userid}/{RoleName}")]
         public async Task<IActionResult> UdpateUser(string userid, string RoleName, [FromBody]UpdateUserDTO model)
         {
-            if (string.IsNullOrWhiteSpace(userid))
-                return BadRequest(new { message = "Invalid user ID." });
+            if (string.IsNullOrWhiteSpace(userid) || string.IsNullOrWhiteSpace(RoleName))
+                return BadRequest(new { message = "Invalid user ID or Role." });
 
 
             try
             {
                 if (ModelState.IsValid)
                 {
-                    if (RoleName == "Dean" || RoleName == "Supervisor")
-                    {
-                        var list = await _accountService.GetAllUsersInRole(RoleName);
-                        if (list.Count() > 0) return BadRequest(new { Message = $"There is already user has the {RoleName} role" });
-                    }
                     var user = await _accountService.FindById(userid);
                     if (user == null) return NotFound(new { Message = "User is not found" });
 
-                    if (model.IsDepartmentManager==true && user.IsDepartmentManager==false)
+                    if (RoleName == "عميد الكلية" || RoleName == "أمين الكلية")
                     {
-                        var entity = _baseDepartmentsManagers.Get(dm => dm.departmentId == model.Departement_ID);
-                        if (entity != null)
+                        var list = await _accountService.GetAllUsersInRole(RoleName);
+                        var manager = list.FirstOrDefault();    
+                        if (manager != null)
                         {
-                            // return name of manager
-                            return BadRequest(new { Message = "This department already has a manager" });
+                            if (manager.Id != userid) return BadRequest(new { Message = $"There is already user has the {RoleName} role, this role should be only assigned to not more than 1 user." });
                         }
                     }
-
-
-                    //var res = await _accountService.Update(userid, model);
-                    user.FirstName = model.FirstName;
-                    user.SecondName = model.SecondName;
-                    user.ThirdName = model.ThirdName;
-                    user.ForthName = model.ForthName;
-                    user.UserName = model.UserName;
-                    user.NationalID = model.NationalID;
-                    user.HireDate = model.HireDate;
-                    user.Active = true;
-                    user.Email = model.Email;
-                    user.PhoneNumber = model.PhoneNumber;
-                    //user.PasswordHash = model.Password;
-                    user.Position = model.Position;
-                    user.DateOfBirth = model.DateOfBirth;
-                    user.Departement_ID = model.Departement_ID;
-
-                    if (model.IsDepartmentManager==false && user.IsDepartmentManager == true)
+                    var u = await _accountService.FindByEmail(model.Email);
+                    if (u != null)
                     {
-                        var entity = _baseDepartmentsManagers.Get(dm => dm.managerid == user.Id);
-                        _baseDepartmentsManagers.Remove(entity);
-                        user.IsDepartmentManager = false;
-                    }
-                    else if(model.IsDepartmentManager == true && user.IsDepartmentManager == false)
-                    {
-                        DepartmentsManagers departmentsManagers = new DepartmentsManagers()
-                        {
-                            managerid = user.Id,
-                            departmentId = (int)user.Departement_ID
-                        };
-                        user.IsDepartmentManager = true;
-                        _baseDepartmentsManagers.Add(departmentsManagers);  
+                        if (u.Id != userid)
+                            return BadRequest(new { Message = "Email is already registered!" });
                     }
 
-                    //if (user.IsDepartmentManager)
-                    //{
-                    //    var entity = _baseDepartmentsManagers.Get(dm => dm.departmentId == user.Departement_ID);
-                    //    var oldmanager = await _accountService.FindById(entity.managerid);
-                    //    oldmanager.IsDepartmentManager = false;
-                    //    await _accountService.Update(oldmanager);
-                    //    entity.managerid = user.Id;
-                    //    _baseDepartmentsManagers.Update(entity);
-                    //}
+                    u = await _accountService.FindByNationalId(model.NationalID);
+                    if (u != null)
+                    {
+                        if (u.Id != userid)
+                            return BadRequest(new { Message = "NationalID is already registered!" });
+                    }
+
+                    u = await _accountService.FindByName(model.UserName);
+                    if (u != null)
+                    {
+                        if (u.Id != userid)
+                            return BadRequest(new { Message = "UserName is already registered!" });
+                    }
+
+                    if (!await _roleService.IsRoleExisted(RoleName))
+                        return BadRequest(new { Message = "Invalid Role!" });
+
+                    if (model.Departement_ID != null)
+                    {
+                        if (await _deptBase.Get(d => d.Id == model.Departement_ID) is null)
+                            return BadRequest(new { Message = "Invalid department!" });
+                    }
+
+                    _mapper.Map(model, user);
 
                     var res = await _accountService.Update(user);
                     if (res.Succeeded)
@@ -330,6 +329,54 @@ namespace Agazaty.Controllers
                             await _accountService.RemoveUserFromRole(user, role);
                         }
                         await _accountService.AddUserToRole(user, RoleName);
+
+                        var ReturnedUser = _mapper.Map<UserDTO>(user);
+                        ReturnedUser.FullName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                        if (user.Departement_ID != null)
+                        {
+                            var dpt = await _deptBase.Get(d => d.Id == user.Departement_ID);
+                            if(dpt!=null) ReturnedUser.DepartmentName = dpt.Name;
+                        }
+                        return Ok(new { Message = "Update is succeeded" , User = ReturnedUser });
+                    }
+                    return BadRequest(res.Errors);
+                }
+                return BadRequest(ModelState);
+
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+            }
+        }
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        [HttpPut("UdpateUserForUser/{userid}")]
+        public async Task<IActionResult> UdpateUserForUser(string userid, [FromBody] UpdateUserDTOforuser model)
+        {
+            if (string.IsNullOrWhiteSpace(userid))
+                return BadRequest(new { message = "Invalid user ID." });
+
+            try
+            {
+                if (ModelState.IsValid)
+                {
+                    //var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                    var user = await _accountService.FindById(userid);
+                    if (user == null) return NotFound(new { Message = "User is not found" });
+
+                    var u = await _accountService.FindByEmail(model.Email);
+                    if (u != null)
+                    {
+                        if (u.Id != userid)
+                            return BadRequest(new { Message = "Email is already registered!" });
+                    }
+
+                    user.Email = model.Email;
+                    user.PhoneNumber = model.PhoneNumber;
+
+                    var res = await _accountService.Update(user);
+                    if (res.Succeeded)
+                    {
                         return Ok(new { Message = "Update is succeeded"});
                     }
                     return BadRequest(res.Errors);
@@ -342,7 +389,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpDelete("DeleteUser/{userid}")]
         public async Task<IActionResult> DeleteUser(string userid)
         {
@@ -353,8 +400,11 @@ namespace Agazaty.Controllers
                 var user = await _accountService.FindById(userid);
                 if (user != null)
                 {
-                    var entity = _baseDepartmentsManagers.Get(dm => dm.managerid == user.Id);
-                    if(entity!=null) _baseDepartmentsManagers.Remove(entity);
+                    var IsDeptHead = await _deptBase.Get(d => d.ManagerId == user.Id);
+                    if (IsDeptHead != null)
+                    {
+                        return BadRequest(new { Message = $"This user is {IsDeptHead.Name} department manager, you should assign a new manager to this department before deleting this user." });
+                    }
                     var res = await _accountService.Delete(user);
                     if (res.Succeeded)
                     {
@@ -371,3 +421,4 @@ namespace Agazaty.Controllers
         }
     }
 }
+

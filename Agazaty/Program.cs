@@ -20,14 +20,23 @@ namespace Agazaty
             // Add services to the container.
 
             builder.Services.AddDbContext<AppDbContext>(op => op.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-            builder.Services.AddIdentity<ApplicationUser, IdentityRole>().AddEntityFrameworkStores<AppDbContext>();
+            builder.Services.AddIdentity<ApplicationUser, IdentityRole>(
+                options =>
+                {
+                    options.Password.RequireDigit = false;       // No numbers required
+                    options.Password.RequireLowercase = false;   // No lowercase required
+                    options.Password.RequireUppercase = false;   // No uppercase required
+                    options.Password.RequireNonAlphanumeric = false; // No special characters required
+                    options.Password.RequiredLength = 1;         // Min length = 1 (can be any value)
+                    options.Password.RequiredUniqueChars = 0;    // No unique characters required
+                }).AddEntityFrameworkStores<AppDbContext>();/*.AddDefaultTokenProviders();*/
+
             builder.Services.AddScoped<IEntityBaseRepository<SickLeave>, EntityBaseRepository<SickLeave>>();
             builder.Services.AddScoped<IEntityBaseRepository<Department>, EntityBaseRepository<Department>>();
             builder.Services.AddScoped<IEntityBaseRepository<CasualLeave>, EntityBaseRepository<CasualLeave>>();
             builder.Services.AddScoped<IEntityBaseRepository<PermitLeave>, EntityBaseRepository<PermitLeave>>();
             builder.Services.AddScoped<IEntityBaseRepository<PermitLeaveImage>, EntityBaseRepository<PermitLeaveImage>>();
             builder.Services.AddScoped<IEntityBaseRepository<NormalLeave>, EntityBaseRepository<NormalLeave>>();
-            builder.Services.AddScoped<IEntityBaseRepository<DepartmentsManagers>, EntityBaseRepository<DepartmentsManagers>>();
             builder.Services.AddScoped<IAccountService, AccountService>();
             builder.Services.AddScoped<IRoleService, RoleService>();
 
@@ -42,7 +51,7 @@ namespace Agazaty
             })
                 .AddJwtBearer(o => {
                     o.RequireHttpsMetadata = false;
-                    o.SaveToken = false;
+                    o.SaveToken = true;
                     o.TokenValidationParameters = new TokenValidationParameters
                     {
                         ValidateIssuerSigningKey = true,
@@ -54,6 +63,17 @@ namespace Agazaty
                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JWT:Key"]))
                     };
                 });
+            /*
+             Development (Local Testing)
+                options.RequireHttpsMetadata = false; // Allow HTTP for local development
+                options.SaveToken = true;             // Store token if needed for later access
+
+             Production (Live Environment)
+                options.RequireHttpsMetadata = true;  // Enforce HTTPS for security
+                options.SaveToken = false;            // No need to store token if only validating it
+             */
+            builder.Services.AddAuthorization();
+
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();

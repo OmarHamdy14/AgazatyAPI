@@ -4,23 +4,23 @@
 
 namespace Agazaty.Migrations
 {
-    public partial class V11 : Migration
+    public partial class V1 : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "LeaveId",
-                table: "PermitLeaveImages");
+                name: "EmployeeNationalNumber",
+                table: "PermitLeaves");
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "LeaveId",
-                table: "PermitLeaveImages",
-                type: "int",
+            migrationBuilder.AddColumn<string>(
+                name: "EmployeeNationalNumber",
+                table: "PermitLeaves",
+                type: "nvarchar(max)",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: "");
         }
     }
 }
