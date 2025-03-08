@@ -19,6 +19,8 @@ namespace Agazaty
             CreateMap<PermitLeave, UpdatePermitLeaveDTO>().ReverseMap();
             CreateMap<PermitLeave, PermitLeaveDTO>().ReverseMap();
 
+            CreateMap<PermitLeaveImage, PermitLeaveImageDTO>().ReverseMap();
+
             CreateMap<CasualLeave, CreateCasualLeaveDTO>().ReverseMap();
             CreateMap<CasualLeave, UpdateCasualLeaveDTO>().ReverseMap();
             CreateMap<CasualLeave, CasualLeaveDTO>().ReverseMap();

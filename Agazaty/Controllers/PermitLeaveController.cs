@@ -31,10 +31,10 @@ namespace Agazaty.Controllers
             _accountService = accountService;
         }
         [Authorize]
-        [HttpGet("GetPermitLeaveImageById/{leaveID:int}", Name = "GetPermitLeaveImageById")]
+        [HttpGet("GetPermitLeaveImageByleaveId/{leaveID:int}", Name = "GetPermitLeaveImageByleaveId")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<PermitLeaveDTO>> GetPermitLeaveImageById(int leaveID)
+        public async Task<ActionResult<PermitLeaveDTO>> GetPermitLeaveImageByleaveId(int leaveID)
         {
             if (leaveID <= 0)
                 return BadRequest(new { message = "Invalid leave ID." });
@@ -45,7 +45,7 @@ namespace Agazaty.Controllers
                 {
                     return NotFound(new { Message = "No permit Leave image found." });
                 }
-                return Ok(permitLeaveImage);
+                return Ok(_mapper.Map<PermitLeaveImageDTO>(permitLeaveImage));
             }
             catch (Exception ex)
             {

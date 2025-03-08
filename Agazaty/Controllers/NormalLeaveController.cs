@@ -772,6 +772,7 @@ namespace Agazaty.Controllers
                     return NotFound(new { message = "Normal Leave not found or not eligible for update" });
                 }
 
+                var user = await _accountService.FindById(NormalLeave.UserID);
                 // Update properties
                 NormalLeave.DirectManager_Decision = model.DirectManagerDecision;
                 if (model.DirectManagerDecision == false)
@@ -782,13 +783,12 @@ namespace Agazaty.Controllers
                     NormalLeave.Holder = Holder.NotWaiting;
                     NormalLeave.RejectedBy = RejectedBy.DirectManager;
 
-
-                    //var emailrequest = new EmailRequest
-                    //{
-                    //    Email = user.Email,
-                    //    Subject = "تم رفض اجازتك الاعتيادية المطلوبة"
-                    //};
-                    //await _EmailService.SendEmail(emailrequest);
+                    var emailrequest = new EmailRequest
+                    {
+                        Email = user.Email,
+                        Subject = "تم رفض اجازتك الاعتيادية المطلوبة"
+                    };
+                    await _EmailService.SendEmail(emailrequest);
                 }
                 else
                 {
@@ -799,7 +799,6 @@ namespace Agazaty.Controllers
                 await _base.Update(NormalLeave);
 
                 var leave = _mapper.Map<NormalLeaveDTO>(NormalLeave);
-                var user = await _accountService.FindById(NormalLeave.UserID);
                 var coworker = await _accountService.FindById(NormalLeave.Coworker_ID);
                 var generalManager = await _accountService.FindById(NormalLeave.General_ManagerID); ;
                 var directManager = await _accountService.FindById(NormalLeave.Direct_ManagerID);
@@ -840,6 +839,7 @@ namespace Agazaty.Controllers
                     return NotFound(new { message = "Normal Leave not found or not eligible for update" });
                 }
 
+                var user = await _accountService.FindById(NormalLeave.UserID);
                 // Update properties
                 NormalLeave.CoWorker_Decision = CoworkerDecision;
                 if (CoworkerDecision == false)
@@ -850,12 +850,12 @@ namespace Agazaty.Controllers
                     NormalLeave.RejectedBy = RejectedBy.CoWorker;
 
 
-                    //var emailrequest = new EmailRequest
-                    //{
-                    //    Email = user.Email,
-                    //    Subject = "تم رفض اجازتك الاعتيادية المطلوبة"
-                    //};
-                    //await _EmailService.SendEmail(emailrequest);
+                    var emailrequest = new EmailRequest
+                    {
+                        Email = user.Email,
+                        Subject = "تم رفض اجازتك الاعتيادية المطلوبة"
+                    };
+                    await _EmailService.SendEmail(emailrequest);
                 }
                 else
                 {
@@ -875,7 +875,6 @@ namespace Agazaty.Controllers
                 await _base.Update(NormalLeave);
 
                 var leave = _mapper.Map<NormalLeaveDTO>(NormalLeave);
-                var user = await _accountService.FindById(NormalLeave.UserID);
                 var coworker = await _accountService.FindById(NormalLeave.Coworker_ID);
                 var generalManager = await _accountService.FindById(NormalLeave.General_ManagerID); ;
                 var directManager = await _accountService.FindById(NormalLeave.Direct_ManagerID);
