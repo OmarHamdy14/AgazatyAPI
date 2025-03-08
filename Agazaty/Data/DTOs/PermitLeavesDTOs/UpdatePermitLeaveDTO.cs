@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using Agazaty.Models;
+using System.ComponentModel.DataAnnotations;
 
 namespace Agazaty.Data.DTOs.PermitLeavesDTOs
 {

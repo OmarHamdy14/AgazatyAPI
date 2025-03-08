@@ -8,6 +8,8 @@ using AutoMapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Agazaty.Data.Email;
+using Agazaty.Data.Services.AutomaticInitializationService;
 
 namespace Agazaty
 {
@@ -39,10 +41,15 @@ namespace Agazaty
             builder.Services.AddScoped<IEntityBaseRepository<NormalLeave>, EntityBaseRepository<NormalLeave>>();
             builder.Services.AddScoped<IAccountService, AccountService>();
             builder.Services.AddScoped<IRoleService, RoleService>();
+            builder.Services.AddScoped<IEmailService, EmailService>();
+
+            builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 
             builder.Services.Configure<JWT>(builder.Configuration.GetSection("JWT"));
 
             builder.Services.AddAutoMapper(typeof(Program));
+
+            builder.Services.AddHostedService<JulyLeaveInitializationService>();
 
             builder.Services.AddAuthentication(options =>
             {

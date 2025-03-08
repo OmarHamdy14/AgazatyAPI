@@ -39,10 +39,14 @@ namespace Agazaty.Data.DTOs.AccountDTOs
         [RegularExpression(@"^\d{14}$", ErrorMessage = "The National Number field must contain exactly 14 digits with no spaces or other characters.")]
         public string NationalID { get; set; }
         [Required]
+        public int position { get; set; }
+        [Required]
         [Range(0, double.MaxValue)]
         public double NormalLeavesCount { get; set; }
         [Range(0, double.MaxValue)]
         public double CasualLeavesCount { get; set; }
+        public int HistoryNormalLeavesCount { get; set; }
+        public double SickLeavesCount { get; set; }
         public int? Departement_ID { get; set; }
     }
 }

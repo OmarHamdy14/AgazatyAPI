@@ -24,7 +24,7 @@ namespace Agazaty.Controllers
             _base = Ebase;
             _accountService = accountService;
         }
-        //[Authorize]
+        [Authorize]
         [HttpGet("GetCasualLeaveById/{leaveID:int}", Name = "GetCasualLeave")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -49,7 +49,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetAllCasualLeaves", Name = "GetAllCasualLeaves")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -75,7 +75,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize]
         [HttpGet("GetAllCasualLeavesByUserID/{userID}", Name = "GetAllCasualLeavesByUserID")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -103,7 +103,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize]
         [HttpGet("GetAllCasualLeavesByUserIDAndYear/{userID}/{year:int}", Name = "GetAllCasualLeavesByUserIDAndYear")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -132,7 +132,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize]
         [HttpPost("CreateCasualLeave", Name = "CreateCasualLeave")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -168,7 +168,8 @@ namespace Agazaty.Controllers
 
 
                 var casualLeave = _mapper.Map<CasualLeave>(model);
-                casualLeave.Year = model.StartDate.Year;   
+                casualLeave.Year = model.StartDate.Year;
+                casualLeave.RequestDate = DateTime.UtcNow.Date;
                 user.CasualLeavesCount -= ((casualLeave.EndDate - casualLeave.StartDate).TotalDays + 1) ;
                 await _accountService.Update(user);
                 await _base.Add(casualLeave);
@@ -182,7 +183,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpPut("UpdateCasualLeave/{leaveID:int}", Name = "UpdateCasualLeave")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -241,7 +242,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpDelete("DeleteCasualLeave/{leaveID:int}", Name = "DeleteCasualLeave")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]

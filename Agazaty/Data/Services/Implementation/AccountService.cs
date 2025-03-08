@@ -1,5 +1,7 @@
 ﻿using Agazaty.Data.Base;
 using Agazaty.Data.DTOs.AccountDTOs;
+using Agazaty.Data.Email;
+using Agazaty.Data.Email.DTOs;
 using Agazaty.Data.Services.Interfaces;
 using Agazaty.Models;
 using AutoMapper;
@@ -8,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System;
@@ -25,7 +28,9 @@ namespace Agazaty.Data.Services.Implementation
         private readonly AppDbContext _appDbContext;
         private readonly IMapper _mapper;
         private readonly JWT _jwt;
-        public AccountService(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, AppDbContext appDbContext, IMapper mapper, IOptions<JWT> jwt, IEntityBaseRepository<Department> baseDepartment)
+        private readonly IEmailService _EmailService;
+        private readonly IServiceProvider _serviceProvider;
+        public AccountService(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager, AppDbContext appDbContext, IMapper mapper, IOptions<JWT> jwt, IEntityBaseRepository<Department> baseDepartment, IEmailService EmailService, IServiceProvider serviceProvider)
         {
             _userManager = userManager;
             _appDbContext = appDbContext;
@@ -33,6 +38,8 @@ namespace Agazaty.Data.Services.Implementation
             _jwt = jwt.Value;
             _roleManager = roleManager;
             _baseDepartment = baseDepartment;
+            _EmailService = EmailService;
+            _serviceProvider = serviceProvider;
         }
         public async Task<IdentityResult> ChangePassword(ApplicationUser user, ChangePasswordDTO model)
         {
@@ -41,49 +48,117 @@ namespace Agazaty.Data.Services.Implementation
         }
         public async Task<ApplicationUser> FindById(string UserId)
         {
-            return await _userManager.FindByIdAsync(UserId);
+            var user = await _userManager.FindByIdAsync(UserId);
+            if (user != null)
+            {
+                if (user.Active == true) return user;
+                return null;
+            }
+            return null;
         }
         public async Task<ApplicationUser> FindByNationalId(string NationalId)
         {
-            return await _appDbContext.Users.FirstOrDefaultAsync(u => u.NationalID == NationalId);
+            return await _appDbContext.Users.Where(u => u.NationalID == NationalId && u.Active==true).FirstOrDefaultAsync();
         }
         public async Task<ApplicationUser> FindByName(string UserName)
         {
-            return await _userManager.FindByNameAsync(UserName);
+            var user = await _userManager.FindByNameAsync(UserName);
+            if (user != null)
+            {
+                if (user.Active == true) return user;
+                return null;
+            }
+            return null;
         }
         public async Task<ApplicationUser> FindByEmail(string email)
         {
-            return await _userManager.FindByEmailAsync(email);
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user != null)
+            {
+                if (user.Active == true) return user;
+                return null;
+            }
+            return null;
         }
-        public async Task<IEnumerable<ApplicationUser>> GetAllUsers()
+        public async Task<IEnumerable<ApplicationUser>> GetAllActiveUsers()
         {
-            return await _appDbContext.Users.ToListAsync();/*.AsNoTracking();*/
+            return await _appDbContext.Users.Where(u => u.Active==true).ToListAsync();/*.AsNoTracking();*/
+        }
+        public async Task<IEnumerable<ApplicationUser>> GetAllNotActiveUsers()
+        {
+            return await _appDbContext.Users.Where(u => u.Active == false).ToListAsync();/*.AsNoTracking();*/
+        }
+        public async Task<IEnumerable<ApplicationUser>> GetAllActiveAvailableCoworkers(ApplicationUser user)
+        {
+            var role = (await GetAllRolesOfUser(user)).FirstOrDefault();
+            if(role=="عميد الكلية")
+            {
+                var coworkers = await GetAllUsersInRole("هيئة تدريس");
+                var supervisor = (await GetAllUsersInRole("أمين الكلية")).Where(u=>u.Active==true).FirstOrDefault();
+                coworkers.Append(supervisor);
+                return coworkers;
+            }
+            else if(role=="أمين الكلية")
+            {
+                var coworkers = await GetAllUsersInRole("موظف");
+                var dean = (await GetAllUsersInRole("عميد الكلية")).Where(u => u.Active == true).FirstOrDefault();
+                coworkers.Append(dean); 
+                return coworkers;
+            }
+            else
+            {
+                var coworkers = (await GetAllUsersInRole(role)).Where(u => u.position <= user.position && u.Active==true);
+                return coworkers;   
+            }
         }
         public async Task<IEnumerable<ApplicationUser>> GetAllUsersInRole(string RoleName)
         {
-            return await _userManager.GetUsersInRoleAsync(RoleName);
+            return (await _userManager.GetUsersInRoleAsync(RoleName)).Where(u => u.Active == true);
         }
         public async Task<IEnumerable<ApplicationUser>> GetAllUsersByDepartmentId(int DepartmentId)
         {
-            return await _appDbContext.Users.Where(u => u.Departement_ID==DepartmentId).ToListAsync();
+            return await _appDbContext.Users.Where(u => u.Departement_ID==DepartmentId && u.Active==true).ToListAsync();
         }
         public async Task<IEnumerable<string>> GetAllRolesOfUser(ApplicationUser user)
         {
             return await _userManager.GetRolesAsync(user);
         }
+        public async Task<string> GetFirstRole(ApplicationUser user)
+        {
+            var roles = await _userManager.GetRolesAsync(user);
+            return roles.FirstOrDefault();
+        }
         public async Task<string> GetDeanORSupervisor(string RoleName)
         {
-            var res = await _userManager.GetUsersInRoleAsync(RoleName);
-            return res.FirstOrDefault().Id;
+            var res = (await _userManager.GetUsersInRoleAsync(RoleName)).Where(u => u.Active == true);
+            if (res.Any())
+            {
+                return res.First().Id;
+            }
+            return null;
         }
-        public async Task InitalizeLeavesCountOfUser(string userid)
+        public async Task InitalizeLeavesCountOfUser()
         {
-            var user = await FindById(userid);
-            user.CasualLeavesCount = 7;
-            if ((user.HireDate - DateTime.UtcNow.Date).TotalDays >= 30 * 6) user.NormalLeavesCount = 15;
-            if ((user.HireDate - DateTime.UtcNow.Date).TotalDays >= 28 * 12) user.NormalLeavesCount = 28;
-            if ((user.HireDate - DateTime.UtcNow.Date).TotalDays >= 364 * 10) user.NormalLeavesCount = 37;
-            if ((user.DateOfBirth - DateTime.UtcNow.Date).TotalDays >= 365 * 50) user.NormalLeavesCount = 52;
+            using (var scope = _serviceProvider.CreateScope()) // To resolve dependencies in BackgroundService
+            {
+                var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+
+                var users = userManager.Users.ToList(); // Fetch all users
+                foreach (var user in users)
+                {
+                    user.CasualLeavesCount = 7;
+                    var hireDuration = (DateTime.UtcNow.Date - user.HireDate).TotalDays;
+                    var age = (user.DateOfBirth - DateTime.UtcNow.Date).TotalDays;
+                    if(age >= 365*50) user.NormalLeavesCount = 52;
+                    else
+                    {
+                        if (hireDuration >= 30 * 6) user.NormalLeavesCount = 15;
+                        else if (hireDuration >= 28 * 12) user.NormalLeavesCount = 28;
+                        else if (hireDuration >= 364 * 10) user.NormalLeavesCount = 37;
+                    }
+                    await userManager.UpdateAsync(user);
+                }
+            }
         }
         public async Task<bool> IsInRoleAsync(ApplicationUser user, string RoleName)
         {
@@ -179,6 +254,74 @@ namespace Agazaty.Data.Services.Implementation
         public async Task<IdentityResult> Delete(ApplicationUser user)
         {
             return await _userManager.DeleteAsync(user);
+        }
+        public async Task<AuthModel> ForgetPassword(string Email)
+        {
+            var Account = await FindByEmail(Email);
+            if (Account == null)
+            {
+                return new AuthModel { Message = "user not found" };
+            }
+
+            return await SendOTP(Email);
+        }
+        public async Task<AuthModel> ResetPassword(ResetPasswordDTO DTO)
+        {
+            var Account = await FindByEmail(DTO.email);
+            if (Account == null)
+            {
+                return new AuthModel { Message = "user not found" };
+            }
+            if (DTO.token == null || DTO.token != Account.OTP || DateTime.UtcNow > Account.OTPExpiry)
+            {
+                return new AuthModel { Message = "Invalid OTP" };
+            }
+            string NewHashedPassword = _userManager.PasswordHasher.HashPassword(Account, DTO.newPasswod);
+            Account.PasswordHash = NewHashedPassword;
+            Account.OTP = null;
+            Account.OTPExpiry = null;
+            var result = await _userManager.UpdateAsync(Account);
+            if (!result.Succeeded)
+            {
+                var errors = string.Empty;
+                foreach (var error in result.Errors)
+                {
+                    errors += $"{error.Description} , ";
+                }
+                return new AuthModel { Message = errors };
+            }
+            return new AuthModel { Message = "Password Changed successfully" };
+            //var result=await _UserManager.ResetPasswordAsync(user, token, NewPassword);
+        }
+        private string GenerateOTP()
+        {
+            Random random = new Random();
+            string randomNumber = random.Next(0, 1000000).ToString("D6");
+            return randomNumber;
+        }
+        public async Task<AuthModel> SendOTP(string email)
+        {
+            var account = await FindByEmail(email);
+            if (account == null)
+            {
+                return new AuthModel { Message = "account not found." };
+            }
+            if (account.OTP != null && account.OTPExpiry > DateTime.UtcNow)
+            {
+                return new AuthModel { Message = "there is already otp sent" };
+            }
+            string OTP = GenerateOTP();
+            account.OTP = OTP;
+            account.OTPExpiry = DateTime.UtcNow.AddMinutes(5);
+            await _userManager.UpdateAsync(account);
+            var emailrequest = new EmailRequest
+            {
+                Email = account.Email,
+                Subject = "Your OTP",
+                Body = $"Your OTP is {OTP}"
+            };
+            await _EmailService.SendEmail(emailrequest);
+            return new AuthModel { Email = account.Email, Message = "OTP has been sent to your email" };
         }
     }
 }

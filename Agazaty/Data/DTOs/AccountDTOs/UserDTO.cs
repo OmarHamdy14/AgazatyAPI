@@ -10,6 +10,5 @@ namespace Agazaty.Data.DTOs.AccountDTOs
         public double SickLeavesCount { get; set; }
         public double NormalLeavesCount { get; set; }
         public double CasualLeavesCount { get; set; }
-        public double PermitLeavesCount { get; set; }
     }
 }

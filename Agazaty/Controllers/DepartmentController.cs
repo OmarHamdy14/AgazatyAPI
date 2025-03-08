@@ -25,7 +25,7 @@ namespace Agazaty.Controllers
             _base = Ebase;
             _accountService = accountService;
         }
-        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpGet("GetAllDepartments")]
         public async Task<IActionResult> GetAllDepartments()
         {
@@ -50,7 +50,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpGet("GetDepartmentById/{departmentID:int}")]
         public async Task<IActionResult> GetDepartmentById(int departmentID)
         {
@@ -77,7 +77,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPost("CreateDepartment")]
         public async Task<IActionResult> CreateDepartment([FromBody]CreateDepartmentDTO model)
         {
@@ -113,7 +113,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPut("UpdateDepartment/{departmentID:int}")]
         public async Task<IActionResult> UpdateDepartment([FromRoute]int departmentID, [FromBody]UpdateDepartmentDTO model)
         {
@@ -153,7 +153,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpDelete("DeleteDepartment/{departmentID:int}")]
         public async Task<IActionResult> DeleteDepartment(int departmentID)
         {

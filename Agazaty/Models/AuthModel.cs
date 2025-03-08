@@ -5,6 +5,7 @@ namespace Agazaty.Models
     public class AuthModel
     {
         public string FullName { get; set; }
+        public string Email { get; set; }
         public string DepartmentName { get; set; }
         public double SickLeavesCount { get; set; }
         public double NormalLeavesCount { get; set; }

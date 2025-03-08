@@ -30,7 +30,29 @@ namespace Agazaty.Controllers
             _webHostEnvironment = webHostEnvironment;
             _accountService = accountService;
         }
-        //[Authorize(Roles = "مدير الموارد البشرية")]
+        [Authorize]
+        [HttpGet("GetPermitLeaveImageById/{leaveID:int}", Name = "GetPermitLeaveImageById")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<PermitLeaveDTO>> GetPermitLeaveImageById(int leaveID)
+        {
+            if (leaveID <= 0)
+                return BadRequest(new { message = "Invalid leave ID." });
+            try
+            {
+                var permitLeaveImage = await _PermitImagebase.Get(c => c.LeaveId == leaveID);
+                if (permitLeaveImage == null)
+                {
+                    return NotFound(new { Message = "No permit Leave image found." });
+                }
+                return Ok(permitLeaveImage);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+            }
+        }
+        [Authorize]
         [HttpGet("GetPermitLeaveById/{leaveID:int}", Name = "GetPermitLeave")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -40,7 +62,7 @@ namespace Agazaty.Controllers
                 return BadRequest(new { message = "Invalid leave ID." });
             try
             {
-                var permitLeave = await _Permitbase.Get(c => c.Id == leaveID);
+                var permitLeave = await _Permitbase.Get(c => c.Id == leaveID, "PermitLeaveImage");
                 if (permitLeave == null)
                 {
                     return NotFound(new { Message = "No permit Leave found." });
@@ -55,7 +77,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpGet("GetAllPermitLeaves", Name = "GetAllPermitLeaves")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -63,7 +85,7 @@ namespace Agazaty.Controllers
         {
             try
             {
-                var permitLeaves = await _Permitbase.GetAll();
+                var permitLeaves = await _Permitbase.GetAll(null, "PermitLeaveImage");
                 if (!permitLeaves.Any())
                 {
                     return NotFound(new { Message = "Ino permit leaves found." });
@@ -82,7 +104,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize]
         [HttpGet("GetAllPermitLeavesByUserID/{userID}", Name = "GetAllPermitLeavesByUserID")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -92,7 +114,7 @@ namespace Agazaty.Controllers
                 return BadRequest(new { message = "Invalid user ID." });
             try
             {
-                var permitLeaves = await _Permitbase.GetAll(p => p.UserId == userID);
+                var permitLeaves = await _Permitbase.GetAll(p => p.UserId == userID, "PermitLeaveImage");
                 if (!permitLeaves.Any())
                 {
                     return NotFound(new { Message = "no permit leaves found" });
@@ -111,7 +133,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize]
         [HttpGet("GetAllPermitLeavesByUserIDAndMonth/{userID}/{month:int}", Name = "GetAllPermitLeavesByUserIDAndMonth")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -122,7 +144,7 @@ namespace Agazaty.Controllers
             try
             {
                 var permitLeaves = await _Permitbase.GetAll(p => p.UserId == userID &&
-                                   p.Date.Month == month);
+                                   p.Date.Month == month, "PermitLeaveImage");
                 if (!permitLeaves.Any())
                 {
                     return NotFound(new { Message = "no permit leaves found." });
@@ -141,7 +163,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize]
         [HttpGet("GetAllPermitLeavesByUserIDAndYear/{userID}/{year:int}", Name = "GetAllPermitLeavesByUserIDAndYear")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -152,7 +174,7 @@ namespace Agazaty.Controllers
             try
             {
                 var permitLeaves = await _Permitbase.GetAll(p => p.UserId == userID &&
-                                   p.Date.Year == year);
+                                   p.Date.Year == year, "PermitLeaveImage");
                 if (!permitLeaves.Any())
                 {
                     return NotFound(new{ Message = "no permit leaves found."});
@@ -171,7 +193,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPost("CreatePermitLeave", Name = "CreatePermitLeave")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -233,7 +255,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPut("UpdatePermitLeave/{leaveID:int}", Name = "UpdatePermitLeave")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -306,7 +328,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpDelete("DeletePermitLeave/{leaveID:int}", Name = "DeletePermitLeave")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -345,7 +367,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpDelete("DeleteImage/{imageId:int}", Name = "DeleteImage")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]

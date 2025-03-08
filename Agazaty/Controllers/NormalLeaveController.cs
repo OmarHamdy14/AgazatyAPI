@@ -1,6 +1,7 @@
 ﻿using Agazaty.Data.Base;
 using Agazaty.Data.DTOs.CasualLeaveDTOs;
 using Agazaty.Data.DTOs.NormalLeaveDTOs;
+using Agazaty.Data.Email;
 using Agazaty.Data.Enums;
 using Agazaty.Data.Services.Interfaces;
 using Agazaty.Models;
@@ -11,6 +12,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using NormalLeaveTask.Models;
 using System.Data;
+using static System.Net.WebRequestMethods;
+using System.Security.Principal;
 
 namespace Agazaty.Controllers
 {
@@ -23,15 +26,17 @@ namespace Agazaty.Controllers
         private readonly IEntityBaseRepository<Department> _departmentBase;
         private readonly IMapper _mapper;
         private readonly AppDbContext _appDbContext;
-        public NormalLeaveController(AppDbContext appDbContext, IEntityBaseRepository<NormalLeave> Ebase, IAccountService accountService, IMapper mapper, IEntityBaseRepository<Department> departmentBase)
+        private readonly IEmailService _EmailService;
+        public NormalLeaveController(AppDbContext appDbContext, IEntityBaseRepository<NormalLeave> Ebase, IAccountService accountService, IMapper mapper, IEntityBaseRepository<Department> departmentBase, IEmailService EmailService)
         {
             _base = Ebase;
             _accountService = accountService;
             _mapper = mapper;   
             _appDbContext = appDbContext;
             _departmentBase = departmentBase;
+            _EmailService = EmailService;
         }
-        //[Authorize]
+        [Authorize]
         [HttpGet("GetNormalLeaveById/{leaveID:int}")]
         public async Task<IActionResult> GetNormalLeaveById(int leaveID)
         {
@@ -62,7 +67,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetAllAcceptedNormalLeaves")]
         public async Task<IActionResult> GetAllAcceptedNormalLeaves()
         {
@@ -96,7 +101,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetAllRejectedNormalLeaves")]
         public async Task<IActionResult> GetAllRejectedNormalLeaves()
         {
@@ -129,7 +134,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize]
         [HttpGet("AllNormalLeavesByUserId/{userID}")]
         public async Task<IActionResult> GetAllNormalLeavesByUserID(string userID)
         {
@@ -165,7 +170,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize]
         [HttpGet("AcceptedByUserId/{userID}")]
         public async Task<IActionResult> GetAllAcceptedNormalLeavesByUserID(string userID)
         {
@@ -203,7 +208,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize]
         [HttpGet("AcceptedByUserIdAndYear/{userID}/{year:int}")]
         public async Task<IActionResult> GetAllAcceptedNormalLeavesByUserIDAndYear(string userID, int year)
         {
@@ -251,7 +256,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize]
         [HttpGet("RejectedByUserId/{userID}")]
         public async Task<IActionResult> GetAllRejectedNormalLeavesByUserID(string userID)
         {
@@ -290,7 +295,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize]
         [HttpGet("WaitingByUserID/{userID}")]
         public async Task<IActionResult> GetAllWaitingNormalLeavesByUserID(string userID)
         {
@@ -329,7 +334,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "عميد الكلية,أمين الكلية")]
+        [Authorize(Roles = "عميد الكلية,أمين الكلية")]
         [HttpGet("WaitingByGeneral_ManagerID/{general_managerID}")]
         public async Task<IActionResult> GetAllWaitingNormalLeavesByGeneral_ManagerID(string general_managerID)
         {
@@ -372,7 +377,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize]
         [HttpGet("WaitingByDirect_ManagerID/{direct_managerID}")]
         public async Task<IActionResult> GetAllWaitingNormalLeavesByDirect_ManagerID(string direct_managerID)
         {
@@ -413,7 +418,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize]
+        [Authorize]
         [HttpGet("WaitingByCoWorkerID/{coworkerID}")]
         public async Task<IActionResult> GetAllWaitingNormalLeavesByCoWorkerID(string coworkerID)
         {
@@ -452,13 +457,13 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية,هيئة تدريس,موظفين")]
+        [Authorize]
         [HttpGet("GetLeaveTypes")]
         public async Task<IActionResult> GetLeaveTypes()
         {
             return Ok(LeaveTypes.res);
         }
-        //[Authorize]
+        [Authorize]
         [HttpPost("CreateNormalLeave")]
         public async Task<IActionResult> CreateNormalLeave([FromBody]CreateNormalLeaveDTO model)
         {
@@ -515,14 +520,15 @@ namespace Agazaty.Controllers
                 if (model.StartDate > model.EndDate)
                     errors.Add("Start date cannot be after the end date.");
 
-                if (model.RequestDate > model.StartDate)
+                if (DateTime.UtcNow.Date > model.StartDate)
                     errors.Add("Request date cannot be after the start date.");
 
                 if (errors.Any())
                     return BadRequest(new { messages = errors });
 
                 var normalLeave = _mapper.Map<NormalLeave>(model);
-                normalLeave.Year = model.RequestDate.Year;
+                normalLeave.RequestDate = DateTime.UtcNow.Date;
+                normalLeave.Year = normalLeave.RequestDate.Year;
                 normalLeave.LeaveStatus = LeaveStatus.Waiting;
                 normalLeave.Holder = Holder.CoWorker;
                 normalLeave.RejectedBy = RejectedBy.NotRejected;
@@ -534,7 +540,7 @@ namespace Agazaty.Controllers
                     normalLeave.General_ManagerID = Dean.Id;
 
                     var DepartmentofUser = await _departmentBase.Get(dm => dm.Id == user.Departement_ID);
-                    if(DepartmentofUser==null) { return BadRequest(new { Message = "This user doesn't have a department." });  }
+                    if(DepartmentofUser==null) { return BadRequest(new { Message = "This user doesn't have a department, so user doesn't have a direct manager." });  }
                     normalLeave.Direct_ManagerID = DepartmentofUser.ManagerId;
                 }
                 else if(await _accountService.IsInRoleAsync(user, "موظف"))
@@ -545,7 +551,7 @@ namespace Agazaty.Controllers
                     normalLeave.General_ManagerID = Supervisor.Id;
 
                     var DepartmentofUser = await _departmentBase.Get(dm => dm.Id == user.Departement_ID);
-                    if (DepartmentofUser == null) { return BadRequest(new { Message = "This user doesn't have a department." }); }
+                    if (DepartmentofUser == null) { return BadRequest(new { Message = "This user doesn't have a department, so user doesn't have a direct manager." }); }
                     normalLeave.Direct_ManagerID = DepartmentofUser.ManagerId;
                 }
                 else if(await _accountService.IsInRoleAsync(user, "أمين الكلية"))
@@ -583,7 +589,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPut("UpdateNormalLeave/{leaveID:int}")]
         public async Task<IActionResult> UpdateNormalLeave(int leaveID, [FromBody] UpdateNormalLeaveDTO model)
         {
@@ -652,7 +658,7 @@ namespace Agazaty.Controllers
             }
 
         }
-        //[Authorize(Roles = "عميد الكلية,أمين الكلية")]
+        [Authorize(Roles = "عميد الكلية,أمين الكلية")]
         [HttpPut("UpdateGeneralManagerDecision/{leaveID:int}")]
         public async Task<IActionResult> UpdateGeneralManagerDecision(int leaveID, [FromBody] GeneralManagerDecisionDTO model)
         {
@@ -691,6 +697,14 @@ namespace Agazaty.Controllers
                     user.NormalLeavesCount -= ((NormalLeave.EndDate - NormalLeave.StartDate).TotalDays + 1);
                     NormalLeave.LeaveStatus = LeaveStatus.Accepted;
                     NormalLeave.Holder = Holder.NotWaiting;
+
+
+                    var emailrequest = new EmailRequest
+                    {
+                        Email = user.Email,
+                        Subject = "تم قبول اجازتك الاعتيادية المطلوبة"
+                    };
+                    await _EmailService.SendEmail(emailrequest);
                 }
                 else
                 {
@@ -698,6 +712,15 @@ namespace Agazaty.Controllers
                     NormalLeave.LeaveStatus = LeaveStatus.Rejected;
                     NormalLeave.RejectedBy = RejectedBy.GeneralManager;
                     NormalLeave.Holder = Holder.NotWaiting;
+
+
+
+                    var emailrequest = new EmailRequest
+                    {
+                        Email = user.Email,
+                        Subject = "تم رفض اجازتك الاعتيادية المطلوبة"
+                    };
+                    await _EmailService.SendEmail(emailrequest);
                 }
 
                 await _base.Update(NormalLeave);
@@ -722,7 +745,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
             }     
         }
-        //[Authorize]
+        [Authorize]
         [HttpPut(("UpdateDirectManagerDecision/{leaveID:int}"))]
         public async Task<IActionResult> UpdateDirectManagerDecision(int leaveID, [FromBody] DirectManagerDecisionDTO model)
         {
@@ -758,6 +781,14 @@ namespace Agazaty.Controllers
                     NormalLeave.LeaveStatus = LeaveStatus.Rejected;
                     NormalLeave.Holder = Holder.NotWaiting;
                     NormalLeave.RejectedBy = RejectedBy.DirectManager;
+
+
+                    //var emailrequest = new EmailRequest
+                    //{
+                    //    Email = user.Email,
+                    //    Subject = "تم رفض اجازتك الاعتيادية المطلوبة"
+                    //};
+                    //await _EmailService.SendEmail(emailrequest);
                 }
                 else
                 {
@@ -788,7 +819,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
             }    
         }
-        //[Authorize]
+        [Authorize]
         [HttpPut("UpdateCoworkerDecision/{leaveID:int}")]
         public async Task<IActionResult> UpdateCoworkerDecision([FromRoute]int leaveID, [FromQuery]bool CoworkerDecision)
         {
@@ -817,6 +848,14 @@ namespace Agazaty.Controllers
                     NormalLeave.LeaveStatus = LeaveStatus.Rejected;
                     NormalLeave.Holder = Holder.NotWaiting;
                     NormalLeave.RejectedBy = RejectedBy.CoWorker;
+
+
+                    //var emailrequest = new EmailRequest
+                    //{
+                    //    Email = user.Email,
+                    //    Subject = "تم رفض اجازتك الاعتيادية المطلوبة"
+                    //};
+                    //await _EmailService.SendEmail(emailrequest);
                 }
                 else
                 {
@@ -856,7 +895,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
             }
          }
-        //[Authorize(Roles = "مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpDelete("DeleteNormalLeave/{leaveID}")]
         public async Task<IActionResult> DeleteNormalLeave([FromRoute]int leaveID)
         {

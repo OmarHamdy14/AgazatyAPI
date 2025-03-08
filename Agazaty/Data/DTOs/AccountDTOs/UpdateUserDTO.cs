@@ -33,12 +33,14 @@ namespace Agazaty.Data.DTOs.AccountDTOs
         public string Gender { get; set; }
         [Required]
         public DateTime DateOfBirth { get; set; }
-        public double SickLeavesCount { get; set; }
+        [Required]
+        public int position { get; set; }
         [Range(0, double.MaxValue)]
         public double NormalLeavesCount { get; set; }
         [Range(0, double.MaxValue)]
         public double CasualLeavesCount { get; set; }
-        public double PermitLeavesCount { get; set; }
+        public double SickLeavesCount { get; set; }
+        public int HistoryNormalLeavesCount { get; set; }
         public int? Departement_ID { get; set; }
     }
 }

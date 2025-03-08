@@ -10,6 +10,7 @@ namespace Agazaty.Data.DTOs.SickLeaveDTOs
         public string EmployeeAddress { get; set; }
         public DateTime RequestDate { get; set; }
         public string? MedicalCommitteAddress { get; set; }
+        public bool RespononseDone { get; set; }
         public int Year { get; set; }
         public string UserName { get; set; }
         public string UserID { get; set; }

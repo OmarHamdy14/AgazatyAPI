@@ -2,7 +2,6 @@
 {
     public class CreateNormalLeaveDTO
     {
-        public DateTime RequestDate { get; set; }
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public string? NotesFromEmployee { get; set; }

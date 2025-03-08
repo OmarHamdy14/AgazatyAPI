@@ -38,6 +38,7 @@ namespace Agazaty
             CreateMap<ApplicationUser, CreateUserDTO>().ReverseMap();
             CreateMap<ApplicationUser, UpdateUserDTO>().ReverseMap();
             CreateMap<ApplicationUser, UserDTO>().ReverseMap();
+            CreateMap<ApplicationUser, CoworkerDTO>().ReverseMap();
 
             CreateMap<IdentityRole, CreateRoleDTO>().ReverseMap();
             CreateMap<IdentityRole, UpdateRoleDTO>().ReverseMap();
