@@ -79,6 +79,17 @@ namespace Agazaty
                 options.RequireHttpsMetadata = true;  // Enforce HTTPS for security
                 options.SaveToken = false;            // No need to store token if only validating it
              */
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll",
+                    policy =>
+                    {
+                        policy.AllowAnyOrigin()
+                              .AllowAnyMethod()
+                              .AllowAnyHeader();
+                    });
+            });
+
             builder.Services.AddAuthorization();
 
             builder.Services.AddControllers();
@@ -88,6 +99,9 @@ namespace Agazaty
 
             var app = builder.Build();
 
+            app.UseHttpsRedirection();
+            app.UseCors("AllowAll");
+
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
@@ -95,7 +109,6 @@ namespace Agazaty
                 app.UseSwaggerUI();
             }
 
-            app.UseHttpsRedirection();
 
             app.UseAuthentication();
             app.UseAuthorization();

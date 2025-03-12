@@ -14,13 +14,14 @@ namespace Agazaty.Data.Services.Interfaces
         Task<ApplicationUser> FindByName(string UserName);
         Task<ApplicationUser> FindByEmail(string email);
         Task<IEnumerable<ApplicationUser>> GetAllActiveUsers();
-        Task<IEnumerable<ApplicationUser>> GetAllNotActiveUsers();
+        Task<IEnumerable<ApplicationUser>> GetAllNonActiveUsers();
         Task<IEnumerable<ApplicationUser>> GetAllActiveAvailableCoworkers(ApplicationUser user);
         Task<IEnumerable<ApplicationUser>> GetAllUsersInRole(string RoleName);
         Task<IEnumerable<ApplicationUser>> GetAllUsersByDepartmentId(int DepartmentId);
         Task<IEnumerable<string>> GetAllRolesOfUser(ApplicationUser user);
         Task<string> GetFirstRole(ApplicationUser user);
         Task<string> GetDeanORSupervisor(string RoleName);
+        Task TransferingUserNormalLeaveCountToNewSection(ApplicationUser user);
         Task InitalizeLeavesCountOfUser();
         //Task InitalizeLeavesCountOfUser(ApplicationUser user);
         Task<bool> IsInRoleAsync(ApplicationUser user, string RoleName);

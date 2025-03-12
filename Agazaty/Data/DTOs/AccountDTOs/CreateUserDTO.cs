@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
 
 namespace Agazaty.Data.DTOs.AccountDTOs
 {
@@ -41,12 +42,23 @@ namespace Agazaty.Data.DTOs.AccountDTOs
         [Required]
         public int position { get; set; }
         [Required]
-        [Range(0, double.MaxValue)]
-        public double NormalLeavesCount { get; set; }
-        [Range(0, double.MaxValue)]
-        public double CasualLeavesCount { get; set; }
-        public int HistoryNormalLeavesCount { get; set; }
-        public double SickLeavesCount { get; set; }
+        [Range(0, int.MaxValue)]
+        public int NormalLeavesCount { get; set; }
+        [Range(0, int.MaxValue)]
+        public int CasualLeavesCount { get; set; }
+        public int SickLeavesCount { get; set; }
         public int? Departement_ID { get; set; }
+        [DefaultValue(0)]
+        public int NormalLeavesCount_47 { get; set; }
+        [DefaultValue(0)]
+        public int NormalLeavesCount_81Before3Years { get; set; }
+        [DefaultValue(0)]
+        public int NormalLeavesCount_81Before2Years { get; set; }
+        [DefaultValue(0)]
+        public int NormalLeavesCount_81Before1Years { get; set; }
+        [DefaultValue(0)]
+        public int HowManyDaysFrom81And47 { get; set; }
+        [DefaultValue(0)]
+        public int YearsOfWork { get; set; }
     }
 }

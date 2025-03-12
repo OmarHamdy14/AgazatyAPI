@@ -1,6 +1,7 @@
 ﻿using Agazaty.Data.Base;
 using Agazaty.Data.DTOs.AccountDTOs;
 using Agazaty.Data.Email.DTOs;
+using Agazaty.Data.Enums;
 using Agazaty.Data.Services.Interfaces;
 using Agazaty.Models;
 using AutoMapper;
@@ -155,6 +156,33 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
+        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        [HttpGet("GetAllNonActiveUsers")]
+        public async Task<IActionResult> GetAllNonActiveUsers()
+        {
+            try
+            {
+                var users = await _accountService.GetAllNonActiveUsers();
+                if (!users.Any()) { return NotFound(new { Message = "There Are No Users Found." }); }
+
+                var ReturnedUsers = _mapper.Map<IEnumerable<UserDTO>>(users);
+                foreach (var ReturnedUser in ReturnedUsers)
+                {
+                    var user = await _accountService.FindById(ReturnedUser.Id);
+                    ReturnedUser.FullName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    if (user.Departement_ID != null)
+                    {
+                        var dpt = await _deptBase.Get(d => d.Id == user.Departement_ID);
+                        ReturnedUser.DepartmentName = dpt.Name;
+                    }
+                }
+                return Ok(ReturnedUsers);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+            }
+        }
         [Authorize]
         [HttpGet("GetAllAvailabelCoworkers/{userId}")]
         public async Task<IActionResult> GetAllAvailableCoworkers(string userId)
@@ -248,7 +276,6 @@ namespace Agazaty.Controllers
                             return BadRequest(new { Message = "Invalid department!" });
                     }
 
-
                     var res = await _accountService.Create(RoleName,model);
                     if (res.Succeeded)
                     {
@@ -294,17 +321,8 @@ namespace Agazaty.Controllers
                     var res = await _accountService.GetTokenAsync(user);
                     if (res.IsAuthenticated)
                     {
-                        // Handling leavesCounts in beginning of every year
-                        //if (DateTime.UtcNow.Month == 7 && user.IntializationCheck)
-                        //{
-                        //    await _accountService.InitalizeLeavesCountOfUser(user);
-                        //    user.IntializationCheck = false;
-                        //}
-                        //else if(DateTime.UtcNow.Month != 7)
-                        //{
-                        //    user.IntializationCheck = true;
-                        //}
-                        //return Ok(res);
+                        await _accountService.TransferingUserNormalLeaveCountToNewSection(user);
+                        return Ok(new {Message = "Login is succeeded"});
                     }
                     return Unauthorized(new {Message = res.Message});
                 }

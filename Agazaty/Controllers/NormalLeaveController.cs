@@ -31,7 +31,7 @@ namespace Agazaty.Controllers
         {
             _base = Ebase;
             _accountService = accountService;
-            _mapper = mapper;   
+            _mapper = mapper;
             _appDbContext = appDbContext;
             _departmentBase = departmentBase;
             _EmailService = EmailService;
@@ -55,7 +55,7 @@ namespace Agazaty.Controllers
                 var user = await _accountService.FindById(NormalLeave.UserID);
                 var coworker = await _accountService.FindById(NormalLeave.Coworker_ID);
                 var generalManager = await _accountService.FindById(NormalLeave.General_ManagerID); ;
-                var directManager = await _accountService.FindById(NormalLeave.Direct_ManagerID); 
+                var directManager = await _accountService.FindById(NormalLeave.Direct_ManagerID);
                 leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
                 leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
                 leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
@@ -345,7 +345,7 @@ namespace Agazaty.Controllers
 
                 var NormalLeaves = await _base.GetAll(n =>
                     n.General_ManagerID == general_managerID &&
-                    n.GeneralManager_Decision==false &&
+                    n.GeneralManager_Decision == false &&
                     n.DirectManager_Decision == true &&
                     n.CoWorker_Decision == true &&
                     n.ResponseDone == false);
@@ -388,7 +388,7 @@ namespace Agazaty.Controllers
 
                 var NormalLeaves = await _base.GetAll(n =>
                     n.Direct_ManagerID == direct_managerID &&
-                    n.DirectManager_Decision==false &&
+                    n.DirectManager_Decision == false &&
                     n.CoWorker_Decision == true &&
                     n.ResponseDone == false);
                 if (!NormalLeaves.Any())
@@ -429,7 +429,7 @@ namespace Agazaty.Controllers
 
                 var NormalLeaves = await _base.GetAll(n =>
                     n.Coworker_ID == coworkerID &&
-                    n.ResponseDone == false && n.CoWorker_Decision==false);
+                    n.ResponseDone == false && n.CoWorker_Decision == false);
                 if (!NormalLeaves.Any())
                 {
                     return NotFound(new { message = "No waiting normal leaves found." });
@@ -465,7 +465,7 @@ namespace Agazaty.Controllers
         }
         [Authorize]
         [HttpPost("CreateNormalLeave")]
-        public async Task<IActionResult> CreateNormalLeave([FromBody]CreateNormalLeaveDTO model)
+        public async Task<IActionResult> CreateNormalLeave([FromBody] CreateNormalLeaveDTO model)
         {
             try
             {
@@ -477,16 +477,24 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(ModelState);
                 }
-                var cowrker = await _accountService.FindById(model.Coworker_ID); 
+                var cowrker = await _accountService.FindById(model.Coworker_ID);
                 var user = await _accountService.FindById(model.UserID);
-                if(model.Coworker_ID==model.UserID || user ==null || cowrker == null)
+                if (model.Coworker_ID == model.UserID || user == null || cowrker == null)
                 {
                     return BadRequest(new { Message = "Invalid user id or coworker id." });
                 }
-                if (((model.EndDate - model.StartDate).TotalDays + 1) > user.CasualLeavesCount)
+
+                if (((model.EndDate - model.StartDate).TotalDays + 1) > user.NormalLeavesCount + user.NormalLeavesCount_81Before1Years + user.NormalLeavesCount_81Before2Years + user.NormalLeavesCount_81Before3Years + user.NormalLeavesCount_47)
                 {
-                    return Ok(new { Message = $"You request {((model.EndDate - model.StartDate).TotalDays + 1)} days, but the number of days available to you are {user.NormalLeavesCount}" });
+                    return BadRequest(new { Message = "no enough days" });
                 }
+
+                int DifferenceDays = (int)(model.EndDate - model.StartDate).TotalDays + 1 - user.NormalLeavesCount;
+                if (user.HowManyDaysFrom81And47 + DifferenceDays > 60)
+                {
+                    return BadRequest(new { Message = "You can't because the limit to you are 60 days." });
+                }
+
 
                 var errors = new List<string>();
                 DateTime today = DateTime.Today;
@@ -509,6 +517,13 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(new { message = "Your requested leave period overlaps with an existing approved leave." });
                 }
+
+
+                user.TakenNormalLeavesCount = 0;
+                user.TakenNormalLeavesCount_47 = 0;
+                user.TakenNormalLeavesCount_81Before1Years = 0;
+                user.TakenNormalLeavesCount_81Before2Years = 0;
+                user.TakenNormalLeavesCount_81Before3Years = 0;
 
                 //validation on year
                 if (model.EndDate < today)
@@ -536,14 +551,14 @@ namespace Agazaty.Controllers
                 {
                     var res = await _accountService.GetAllUsersInRole("عميد الكلية");
                     var Dean = res.FirstOrDefault();
-                    if(Dean == null) { return BadRequest( new { Message = "There no user with the Dean role" });  }
+                    if (Dean == null) { return BadRequest(new { Message = "There no user with the Dean role" }); }
                     normalLeave.General_ManagerID = Dean.Id;
 
                     var DepartmentofUser = await _departmentBase.Get(dm => dm.Id == user.Departement_ID);
-                    if(DepartmentofUser==null) { return BadRequest(new { Message = "This user doesn't have a department, so user doesn't have a direct manager." });  }
+                    if (DepartmentofUser == null) { return BadRequest(new { Message = "This user doesn't have a department, so user doesn't have a direct manager." }); }
                     normalLeave.Direct_ManagerID = DepartmentofUser.ManagerId;
                 }
-                else if(await _accountService.IsInRoleAsync(user, "موظف"))
+                else if (await _accountService.IsInRoleAsync(user, "موظف"))
                 {
                     var res = await _accountService.GetAllUsersInRole("أمين الكلية");
                     var Supervisor = res.FirstOrDefault();
@@ -554,7 +569,7 @@ namespace Agazaty.Controllers
                     if (DepartmentofUser == null) { return BadRequest(new { Message = "This user doesn't have a department, so user doesn't have a direct manager." }); }
                     normalLeave.Direct_ManagerID = DepartmentofUser.ManagerId;
                 }
-                else if(await _accountService.IsInRoleAsync(user, "أمين الكلية"))
+                else if (await _accountService.IsInRoleAsync(user, "أمين الكلية"))
                 {
                     // if أمين الكلية made a leave request
                     var res = await _accountService.GetAllUsersInRole("عميد الكلية");
@@ -591,7 +606,7 @@ namespace Agazaty.Controllers
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPut("UpdateNormalLeave/{leaveID:int}")]
-        public async Task<IActionResult> UpdateNormalLeave(int leaveID, [FromBody] UpdateNormalLeaveDTO model)
+        public async Task<IActionResult> UpdateNormalLeave(int leaveID, [FromBody] UpdateNormalLeaveDTO model) // قطع الاجازة
         {
             if (leaveID <= 0)
                 return BadRequest(new { message = "Invalid leave ID." });
@@ -632,8 +647,141 @@ namespace Agazaty.Controllers
                 var user = await _accountService.FindById(NormalLeave.UserID);
 
                 NormalLeave.NotesFromEmployee = model.NotesFromEmployee;
-                user.NormalLeavesCount += ((NormalLeave.EndDate - model.EndDate).TotalDays + 1);
+                //user.NormalLeavesCount += (int)((NormalLeave.EndDate - model.EndDate).TotalDays + 1);
+
+
+                int returnedDays = (int)((NormalLeave.EndDate - model.EndDate).TotalDays + 1);
                 NormalLeave.EndDate = model.EndDate;
+
+                if (user.Counts == CountsFromNormalLeaveTypes.FromNormalLeave)
+                {
+                    user.NormalLeavesCount += returnedDays;
+                    returnedDays = 0;
+                }
+
+                else if (user.Counts == CountsFromNormalLeaveTypes.From81Before3Years)
+                {
+                    if (returnedDays >= user.TakenNormalLeavesCount_81Before3Years)
+                    {
+                        user.NormalLeavesCount_81Before3Years += user.TakenNormalLeavesCount_81Before3Years;
+                        returnedDays -= user.TakenNormalLeavesCount_81Before3Years;
+                    }
+                    else
+                    {
+                        user.NormalLeavesCount_81Before3Years += returnedDays;
+                        returnedDays = 0;
+                    }
+                    user.NormalLeavesCount += returnedDays;
+                    returnedDays = 0;
+                }
+
+                else if (user.Counts == CountsFromNormalLeaveTypes.From81Before2Years)
+                {
+                    if (returnedDays >= user.TakenNormalLeavesCount_81Before2Years)
+                    {
+                        user.NormalLeavesCount_81Before2Years += user.TakenNormalLeavesCount_81Before2Years;
+                        returnedDays -= user.TakenNormalLeavesCount_81Before2Years;
+                    }
+                    else
+                    {
+                        user.NormalLeavesCount_81Before2Years += returnedDays;
+                        returnedDays = 0;
+                    }
+                    if (returnedDays >= user.TakenNormalLeavesCount_81Before3Years)
+                    {
+                        user.NormalLeavesCount_81Before3Years += user.TakenNormalLeavesCount_81Before3Years;
+                        returnedDays -= user.TakenNormalLeavesCount_81Before3Years;
+                    }
+                    else
+                    {
+                        user.NormalLeavesCount_81Before3Years += returnedDays;
+                        returnedDays = 0;
+                    }
+                    user.NormalLeavesCount += returnedDays;
+                    returnedDays = 0;
+                }
+
+                else if (user.Counts == CountsFromNormalLeaveTypes.From81Before1Years)
+                {
+                    if (returnedDays >= user.TakenNormalLeavesCount_81Before1Years)
+                    {
+                        user.NormalLeavesCount_81Before1Years += user.TakenNormalLeavesCount_81Before1Years;
+                        returnedDays -= user.TakenNormalLeavesCount_81Before1Years;
+                    }
+                    else
+                    {
+                        user.NormalLeavesCount_81Before1Years += returnedDays;
+                        returnedDays = 0;
+                    }
+                    if (returnedDays >= user.TakenNormalLeavesCount_81Before2Years)
+                    {
+                        user.NormalLeavesCount_81Before2Years += user.TakenNormalLeavesCount_81Before2Years;
+                        returnedDays -= user.TakenNormalLeavesCount_81Before2Years;
+                    }
+                    else
+                    {
+                        user.NormalLeavesCount_81Before2Years += returnedDays;
+                        returnedDays = 0;
+                    }
+                    if (returnedDays >= user.TakenNormalLeavesCount_81Before3Years)
+                    {
+                        user.NormalLeavesCount_81Before3Years += user.TakenNormalLeavesCount_81Before3Years;
+                        returnedDays -= user.TakenNormalLeavesCount_81Before3Years;
+                    }
+                    else
+                    {
+                        user.NormalLeavesCount_81Before3Years += returnedDays;
+                        returnedDays = 0;
+                    }
+                    user.NormalLeavesCount += returnedDays;
+                    returnedDays = 0;
+                }
+
+                else if (user.Counts == CountsFromNormalLeaveTypes.From47)
+                {
+                    if (returnedDays >= user.TakenNormalLeavesCount_47)
+                    {
+                        user.NormalLeavesCount_47 += user.TakenNormalLeavesCount_47;
+                        returnedDays -= user.TakenNormalLeavesCount_47;
+                    }
+                    else
+                    {
+                        user.NormalLeavesCount_47 += returnedDays;
+                        returnedDays = 0;
+                    }
+                    if (returnedDays >= user.TakenNormalLeavesCount_81Before1Years)
+                    {
+                        user.NormalLeavesCount_81Before1Years += user.TakenNormalLeavesCount_81Before1Years;
+                        returnedDays -= user.TakenNormalLeavesCount_81Before1Years;
+                    }
+                    else
+                    {
+                        user.NormalLeavesCount_81Before1Years += returnedDays;
+                        returnedDays = 0;
+                    }
+                    if (returnedDays >= user.TakenNormalLeavesCount_81Before2Years)
+                    {
+                        user.NormalLeavesCount_81Before2Years += user.TakenNormalLeavesCount_81Before2Years;
+                        returnedDays -= user.TakenNormalLeavesCount_81Before2Years;
+                    }
+                    else
+                    {
+                        user.NormalLeavesCount_81Before2Years += returnedDays;
+                        returnedDays = 0;
+                    }
+                    if (returnedDays >= user.TakenNormalLeavesCount_81Before3Years)
+                    {
+                        user.NormalLeavesCount_81Before3Years += user.TakenNormalLeavesCount_81Before3Years;
+                        returnedDays -= user.TakenNormalLeavesCount_81Before3Years;
+                    }
+                    else
+                    {
+                        user.NormalLeavesCount_81Before3Years += returnedDays;
+                        returnedDays = 0;
+                    }
+                    user.NormalLeavesCount += returnedDays;
+                    returnedDays = 0;
+                }
 
                 await _base.Update(NormalLeave);
 
@@ -694,7 +842,69 @@ namespace Agazaty.Controllers
                 if (model.GeneralManagerDecision == true)
                 {
                     NormalLeave.Accepted = true;
-                    user.NormalLeavesCount -= ((NormalLeave.EndDate - NormalLeave.StartDate).TotalDays + 1);
+                    if (((NormalLeave.EndDate - NormalLeave.StartDate).TotalDays + 1) > user.NormalLeavesCount)
+                    {                       
+                        user.TakenNormalLeavesCount += user.NormalLeavesCount;
+                        int DifferenceDays = (int)(NormalLeave.EndDate - NormalLeave.StartDate).TotalDays + 1 - user.NormalLeavesCount;
+                        user.NormalLeavesCount = 0;
+                        user.HowManyDaysFrom81And47 += DifferenceDays;
+                        if (DifferenceDays > user.NormalLeavesCount_81Before3Years)
+                        {
+                            user.TakenNormalLeavesCount_81Before3Years += user.NormalLeavesCount_81Before3Years;
+                            DifferenceDays -= user.NormalLeavesCount_81Before3Years;
+                            user.NormalLeavesCount_81Before3Years = 0;
+
+                            if (DifferenceDays > user.NormalLeavesCount_81Before2Years)
+                            {
+                                user.TakenNormalLeavesCount_81Before2Years += user.NormalLeavesCount_81Before2Years;
+                                DifferenceDays -= user.NormalLeavesCount_81Before2Years;
+                                user.NormalLeavesCount_81Before2Years = 0;
+
+                                if (DifferenceDays > user.NormalLeavesCount_81Before1Years)
+                                {
+                                    user.TakenNormalLeavesCount_81Before1Years += user.NormalLeavesCount_81Before1Years;
+                                    DifferenceDays -= user.NormalLeavesCount_81Before1Years;
+                                    user.NormalLeavesCount_81Before1Years = 0;
+                                }
+                                else
+                                {
+                                    user.TakenNormalLeavesCount_81Before1Years += DifferenceDays;
+                                    user.Counts = CountsFromNormalLeaveTypes.From81Before1Years;
+                                    user.NormalLeavesCount_81Before1Years -= DifferenceDays;
+                                    DifferenceDays = 0;
+                                }
+                            }
+                            else
+                            {
+                                user.TakenNormalLeavesCount_81Before2Years += DifferenceDays;
+                                user.Counts = CountsFromNormalLeaveTypes.From81Before2Years;
+                                user.NormalLeavesCount_81Before2Years -= DifferenceDays;
+                                DifferenceDays = 0;
+                            }
+                        }
+                        else
+                        {
+                            user.TakenNormalLeavesCount_81Before3Years += DifferenceDays;
+                            user.Counts = CountsFromNormalLeaveTypes.From81Before3Years;
+                            user.NormalLeavesCount_81Before3Years -= DifferenceDays;
+                            DifferenceDays = 0;
+                        }
+
+                        if (DifferenceDays > 0) 
+                        {
+                            user.TakenNormalLeavesCount_47 += DifferenceDays;
+                            user.NormalLeavesCount_47 -= DifferenceDays;
+                            user.Counts = CountsFromNormalLeaveTypes.From47;
+                        }
+                    }
+                    else
+                    {
+                        user.TakenNormalLeavesCount += (int)((NormalLeave.EndDate - NormalLeave.StartDate).TotalDays + 1);
+                        user.NormalLeavesCount -= user.TakenNormalLeavesCount;
+                        user.Counts = CountsFromNormalLeaveTypes.FromNormalLeave;
+                    }
+
+
                     NormalLeave.LeaveStatus = LeaveStatus.Accepted;
                     NormalLeave.Holder = Holder.NotWaiting;
 
@@ -743,7 +953,7 @@ namespace Agazaty.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
-            }     
+            }
         }
         [Authorize]
         [HttpPut(("UpdateDirectManagerDecision/{leaveID:int}"))]
@@ -816,11 +1026,11 @@ namespace Agazaty.Controllers
             catch (Exception ex)
             {
                 return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
-            }    
+            }
         }
         [Authorize]
         [HttpPut("UpdateCoworkerDecision/{leaveID:int}")]
-        public async Task<IActionResult> UpdateCoworkerDecision([FromRoute]int leaveID, [FromQuery]bool CoworkerDecision)
+        public async Task<IActionResult> UpdateCoworkerDecision([FromRoute] int leaveID, [FromQuery] bool CoworkerDecision)
         {
             if (leaveID <= 0)
                 return BadRequest(new { message = "Invalid leave ID." });
@@ -893,10 +1103,10 @@ namespace Agazaty.Controllers
             {
                 return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
             }
-         }
+        }
         [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpDelete("DeleteNormalLeave/{leaveID}")]
-        public async Task<IActionResult> DeleteNormalLeave([FromRoute]int leaveID)
+        public async Task<IActionResult> DeleteNormalLeave([FromRoute] int leaveID)
         {
             if (leaveID <= 0)
             {

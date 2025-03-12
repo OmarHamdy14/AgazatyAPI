@@ -62,7 +62,7 @@ namespace Agazaty.Controllers
                 return BadRequest(new { message = "Invalid leave ID." });
             try
             {
-                var permitLeave = await _Permitbase.Get(c => c.Id == leaveID, "PermitLeaveImage");
+                var permitLeave = await _Permitbase.Get(c => c.Id == leaveID);
                 if (permitLeave == null)
                 {
                     return NotFound(new { Message = "No permit Leave found." });
@@ -85,7 +85,7 @@ namespace Agazaty.Controllers
         {
             try
             {
-                var permitLeaves = await _Permitbase.GetAll(null, "PermitLeaveImage");
+                var permitLeaves = await _Permitbase.GetAll();
                 if (!permitLeaves.Any())
                 {
                     return NotFound(new { Message = "Ino permit leaves found." });
@@ -114,7 +114,7 @@ namespace Agazaty.Controllers
                 return BadRequest(new { message = "Invalid user ID." });
             try
             {
-                var permitLeaves = await _Permitbase.GetAll(p => p.UserId == userID, "PermitLeaveImage");
+                var permitLeaves = await _Permitbase.GetAll(p => p.UserId == userID);
                 if (!permitLeaves.Any())
                 {
                     return NotFound(new { Message = "no permit leaves found" });
@@ -144,7 +144,7 @@ namespace Agazaty.Controllers
             try
             {
                 var permitLeaves = await _Permitbase.GetAll(p => p.UserId == userID &&
-                                   p.Date.Month == month, "PermitLeaveImage");
+                                   p.Date.Month == month);
                 if (!permitLeaves.Any())
                 {
                     return NotFound(new { Message = "no permit leaves found." });
@@ -174,7 +174,7 @@ namespace Agazaty.Controllers
             try
             {
                 var permitLeaves = await _Permitbase.GetAll(p => p.UserId == userID &&
-                                   p.Date.Year == year, "PermitLeaveImage");
+                                   p.Date.Year == year);
                 if (!permitLeaves.Any())
                 {
                     return NotFound(new{ Message = "no permit leaves found."});

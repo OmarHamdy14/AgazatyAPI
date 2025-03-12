@@ -2,6 +2,7 @@
 using Agazaty.Data.DTOs.AccountDTOs;
 using Agazaty.Data.Email;
 using Agazaty.Data.Email.DTOs;
+using Agazaty.Data.Enums;
 using Agazaty.Data.Services.Interfaces;
 using Agazaty.Models;
 using AutoMapper;
@@ -84,6 +85,10 @@ namespace Agazaty.Data.Services.Implementation
         {
             return await _appDbContext.Users.Where(u => u.Active==true).ToListAsync();/*.AsNoTracking();*/
         }
+        public async Task<IEnumerable<ApplicationUser>> GetAllNonActiveUsers()
+        {
+            return await _appDbContext.Users.Where(u => u.Active == false).ToListAsync();/*.AsNoTracking();*/
+        }
         public async Task<IEnumerable<ApplicationUser>> GetAllNotActiveUsers()
         {
             return await _appDbContext.Users.Where(u => u.Active == false).ToListAsync();/*.AsNoTracking();*/
@@ -137,6 +142,53 @@ namespace Agazaty.Data.Services.Implementation
             }
             return null;
         }
+        public async Task TransferingUserNormalLeaveCountToNewSection(ApplicationUser user)
+        {
+            var hireDuration = (DateTime.UtcNow.Date - user.HireDate).TotalDays;
+            var ageInYears = DateTime.UtcNow.Year - user.DateOfBirth.Year;
+            if (DateTime.UtcNow.Month < user.DateOfBirth.Month ||
+               (DateTime.UtcNow.Month == user.DateOfBirth.Month && DateTime.UtcNow.Day < user.DateOfBirth.Day))
+            {
+                ageInYears--;
+            }
+            if (ageInYears >= 50)
+            {
+                if (user.LeaveSection != NormalLeaveSection.FiftyAge)
+                {
+                    int NumberOfDaysToBeAdded = 0;
+                    if (user.LeaveSection == NormalLeaveSection.SixMonths) NumberOfDaysToBeAdded = 60 - 15;
+                    else if (user.LeaveSection == NormalLeaveSection.OneYear) NumberOfDaysToBeAdded = 60 - 36;
+                    else if (user.LeaveSection == NormalLeaveSection.TenYears) NumberOfDaysToBeAdded = 60 - 45;
+
+                    DateTime today = DateTime.Today;
+                    DateTime nextJuly1 = new DateTime(today.Year, 7, 1);
+                    // If today is already past July 1st, use next year's July 1st
+                    if (today >= nextJuly1) nextJuly1 = new DateTime(today.Year + 1, 7, 1);
+                    int monthsDifference = ((nextJuly1.Year - today.Year) * 12) + nextJuly1.Month - today.Month;
+
+                    NumberOfDaysToBeAdded = (int)Math.Ceiling((NumberOfDaysToBeAdded*1.0) / monthsDifference);
+
+                    user.NormalLeavesCount += NumberOfDaysToBeAdded * monthsDifference;
+
+                    user.LeaveSection = NormalLeaveSection.FiftyAge;
+                    await Update(user);
+                }
+            }
+            else
+            {
+                //DateTime today = DateTime.Today;
+                //int monthsDifference = ((user.HireDate.Year - today.Year) * 12) + user.HireDate.Month - today.Month;
+
+                if (hireDuration >= 30 * 6 && user.LeaveSection == NormalLeaveSection.NoSection)
+                {
+                    user.CasualLeavesCount = 3;
+                    user.NormalLeavesCount += 15;
+                    user.LeaveSection = NormalLeaveSection.SixMonths;
+                    await Update(user);
+                }
+
+            }
+        }
         public async Task InitalizeLeavesCountOfUser()
         {
             using (var scope = _serviceProvider.CreateScope()) // To resolve dependencies in BackgroundService
@@ -146,16 +198,24 @@ namespace Agazaty.Data.Services.Implementation
                 var users = userManager.Users.ToList(); // Fetch all users
                 foreach (var user in users)
                 {
+                    user.NormalLeavesCount_81Before3Years = user.NormalLeavesCount_81Before2Years;
+                    user.NormalLeavesCount_81Before2Years = user.NormalLeavesCount_81Before1Years;
+                    user.NormalLeavesCount_81Before1Years = 0;
                     user.CasualLeavesCount = 7;
-                    var hireDuration = (DateTime.UtcNow.Date - user.HireDate).TotalDays;
-                    var age = (user.DateOfBirth - DateTime.UtcNow.Date).TotalDays;
-                    if(age >= 365*50) user.NormalLeavesCount = 52;
-                    else
-                    {
-                        if (hireDuration >= 30 * 6) user.NormalLeavesCount = 15;
-                        else if (hireDuration >= 28 * 12) user.NormalLeavesCount = 28;
-                        else if (hireDuration >= 364 * 10) user.NormalLeavesCount = 37;
-                    }
+                    user.HowManyDaysFrom81And47 = 0;
+                    user.YearsOfWork++;
+                    if (user.YearsOfWork>=1) { user.NormalLeavesCount = 36; user.LeaveSection = NormalLeaveSection.OneYear; }
+                    if (user.YearsOfWork>=10) { user.NormalLeavesCount = 45; user.LeaveSection = NormalLeaveSection.TenYears; }
+                    if (user.LeaveSection == NormalLeaveSection.FiftyAge) user.NormalLeavesCount = 60;
+                    //var hireDuration = (DateTime.UtcNow.Date - user.HireDate).TotalDays;
+                    //var age = (user.DateOfBirth - DateTime.UtcNow.Date).TotalDays;
+                    //if(age >= 365*50) user.NormalLeavesCount = 60;                       // 50 years age
+                    //else
+                    //{
+                    //    if (hireDuration >= 30 * 6) user.NormalLeavesCount = 15;         // 6 months
+                    //    else if (hireDuration >= 28 * 12) user.NormalLeavesCount = 36;   // 1 year
+                    //    else if (hireDuration >= 364 * 10) user.NormalLeavesCount = 45;  // 10 years
+                    //}
                     await userManager.UpdateAsync(user);
                 }
             }
@@ -181,8 +241,21 @@ namespace Agazaty.Data.Services.Implementation
         {
             var user = _mapper.Map<ApplicationUser>(model);
             user.Active = true;
-            user.SickLeavesCount = 0;
-            user.IntializationCheck = false;
+            //var hireDuration = (DateTime.UtcNow.Date - user.HireDate).TotalDays;
+
+            var ageInYears = DateTime.UtcNow.Year - user.DateOfBirth.Year;
+            if (DateTime.UtcNow.Month < user.DateOfBirth.Month ||
+               (DateTime.UtcNow.Month == user.DateOfBirth.Month && DateTime.UtcNow.Day < user.DateOfBirth.Day))
+            {
+                ageInYears--;
+            }
+            if (ageInYears >= 50) user.LeaveSection = NormalLeaveSection.FiftyAge;
+            else
+            {
+                if (user.YearsOfWork == 0) user.LeaveSection = NormalLeaveSection.NoSection;
+                if (user.YearsOfWork >= 1) user.LeaveSection = NormalLeaveSection.OneYear;
+                if (user.YearsOfWork >= 10) user.LeaveSection = NormalLeaveSection.TenYears;
+            }
 
             var result = await _userManager.CreateAsync(user, model.Password);
             return result;

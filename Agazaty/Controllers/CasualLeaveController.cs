@@ -170,7 +170,7 @@ namespace Agazaty.Controllers
                 var casualLeave = _mapper.Map<CasualLeave>(model);
                 casualLeave.Year = model.StartDate.Year;
                 casualLeave.RequestDate = DateTime.UtcNow.Date;
-                user.CasualLeavesCount -= ((casualLeave.EndDate - casualLeave.StartDate).TotalDays + 1) ;
+                user.CasualLeavesCount -= (int)((casualLeave.EndDate - casualLeave.StartDate).TotalDays + 1) ;
                 await _accountService.Update(user);
                 await _base.Add(casualLeave);
 
@@ -207,7 +207,7 @@ namespace Agazaty.Controllers
                 }
 
                 var user = await _accountService.FindById(model.UserId);
-                user.CasualLeavesCount += ((casualLeave.EndDate - casualLeave.StartDate).TotalDays + 1);
+                user.CasualLeavesCount += (int)((casualLeave.EndDate - casualLeave.StartDate).TotalDays + 1);
 
                 if (((model.EndDate - model.StartDate).TotalDays + 1) > user.CasualLeavesCount)
                 {
@@ -229,7 +229,7 @@ namespace Agazaty.Controllers
 
                 _mapper.Map(model, casualLeave);
                 casualLeave.Year = model.StartDate.Year;
-                user.CasualLeavesCount -= ((casualLeave.EndDate - casualLeave.StartDate).TotalDays + 1);
+                user.CasualLeavesCount -= (int)((casualLeave.EndDate - casualLeave.StartDate).TotalDays + 1);
                 await _accountService.Update(user);
                 await _base.Update(casualLeave);
 
