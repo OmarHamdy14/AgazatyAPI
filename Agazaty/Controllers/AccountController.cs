@@ -322,7 +322,7 @@ namespace Agazaty.Controllers
                     if (res.IsAuthenticated)
                     {
                         await _accountService.TransferingUserNormalLeaveCountToNewSection(user);
-                        return Ok(new {Message = "Login is succeeded"});
+                        return Ok(res);
                     }
                     return Unauthorized(new {Message = res.Message});
                 }

@@ -33,6 +33,7 @@ namespace Agazaty.Models
         [Required]
         [Range(0, int.MaxValue)]
         public int NormalLeavesCount { get; set; }
+        [Required]
         [Range(0, int.MaxValue)]
         public int CasualLeavesCount { get; set; }
         public int SickLeavesCount { get; set; }
