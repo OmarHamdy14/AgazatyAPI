@@ -4,14 +4,16 @@ namespace Agazaty.Models
 {
     public class AuthModel
     {
+        public string Id { get; set; }
         public string FullName { get; set; }
         public string Email { get; set; }
         public string DepartmentName { get; set; }
-        public double SickLeavesCount { get; set; }
-        public double NormalLeavesCount { get; set; }
-        public double CasualLeavesCount { get; set; }
-        public double PermitLeavesCount { get; set; }
-        public List<string> Roles { get; set; }
+        public int SickLeavesCount { get; set; }
+        public int NormalLeavesCount { get; set; }
+        public int CasualLeavesCount { get; set; }
+        public int PermitLeavesCount { get; set; }
+        public string RoleId { get; set; }
+        public string RoleName { get; set; }
         public string Message { get; set; }
         public bool IsAuthenticated { get; set; }
         public string Token { get; set; }

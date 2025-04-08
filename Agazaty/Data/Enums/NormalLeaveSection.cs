@@ -6,6 +6,7 @@
         SixMonths,
         OneYear,
         TenYears,
-        FiftyAge
+        FiftyAge,
+        DisabilityEmployee
     }
 }

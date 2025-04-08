@@ -10,5 +10,8 @@ namespace Agazaty.Data.DTOs.AccountDTOs
         [Required]
         [RegularExpression(@"^\d{11}$", ErrorMessage = "The Phone Number field must contain exactly 11 digits with no spaces or other characters.")]
         public string PhoneNumber { get; set; }
+        public string? Street { get; set; }
+        public string? Governorate { get; set; }
+        public string? State { get; set; }
     }
 }

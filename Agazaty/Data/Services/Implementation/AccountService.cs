@@ -50,40 +50,39 @@ namespace Agazaty.Data.Services.Implementation
         public async Task<ApplicationUser> FindById(string UserId)
         {
             var user = await _userManager.FindByIdAsync(UserId);
-            if (user != null)
-            {
-                if (user.Active == true) return user;
-                return null;
-            }
-            return null;
+            //if (user != null)
+            //{
+            //    if (user.Active == true) return user;
+            //}
+            return user;
         }
         public async Task<ApplicationUser> FindByNationalId(string NationalId)
         {
-            return await _appDbContext.Users.Where(u => u.NationalID == NationalId && u.Active==true).FirstOrDefaultAsync();
+            return await _appDbContext.Users.Where(u => u.NationalID == NationalId).FirstOrDefaultAsync();
         }
         public async Task<ApplicationUser> FindByName(string UserName)
         {
             var user = await _userManager.FindByNameAsync(UserName);
-            if (user != null)
-            {
-                if (user.Active == true) return user;
-                return null;
-            }
-            return null;
+            //if (user != null)
+            //{
+            //    if (user.Active == true) return user;
+            //    return null;
+            //}
+            return user;
         }
         public async Task<ApplicationUser> FindByEmail(string email)
         {
             var user = await _userManager.FindByEmailAsync(email);
-            if (user != null)
-            {
-                if (user.Active == true) return user;
-                return null;
-            }
-            return null;
+            //if (user != null)
+            //{
+            //    if (user.Active == true) return user;
+            //    return null;
+            //}
+            return user;
         }
         public async Task<IEnumerable<ApplicationUser>> GetAllActiveUsers()
         {
-            return await _appDbContext.Users.Where(u => u.Active==true).ToListAsync();/*.AsNoTracking();*/
+            return await _appDbContext.Users.Where(u => u.Active == true).ToListAsync();/*.AsNoTracking();*/
         }
         public async Task<IEnumerable<ApplicationUser>> GetAllNonActiveUsers()
         {
@@ -96,24 +95,24 @@ namespace Agazaty.Data.Services.Implementation
         public async Task<IEnumerable<ApplicationUser>> GetAllActiveAvailableCoworkers(ApplicationUser user)
         {
             var role = (await GetAllRolesOfUser(user)).FirstOrDefault();
-            if(role=="عميد الكلية")
+            if (role == "عميد الكلية")
             {
                 var coworkers = await GetAllUsersInRole("هيئة تدريس");
-                var supervisor = (await GetAllUsersInRole("أمين الكلية")).Where(u=>u.Active==true).FirstOrDefault();
+                var supervisor = (await GetAllUsersInRole("أمين الكلية")).Where(u => u.Active == true).FirstOrDefault();
                 coworkers.Append(supervisor);
                 return coworkers;
             }
-            else if(role=="أمين الكلية")
+            else if (role == "أمين الكلية")
             {
                 var coworkers = await GetAllUsersInRole("موظف");
                 var dean = (await GetAllUsersInRole("عميد الكلية")).Where(u => u.Active == true).FirstOrDefault();
-                coworkers.Append(dean); 
+                coworkers.Append(dean);
                 return coworkers;
             }
             else
             {
-                var coworkers = (await GetAllUsersInRole(role)).Where(u => u.position <= user.position && u.Active==true);
-                return coworkers;   
+                var coworkers = (await GetAllUsersInRole(role)).Where(u => u.position <= user.position && u.Active == true);
+                return coworkers;
             }
         }
         public async Task<IEnumerable<ApplicationUser>> GetAllUsersInRole(string RoleName)
@@ -122,7 +121,7 @@ namespace Agazaty.Data.Services.Implementation
         }
         public async Task<IEnumerable<ApplicationUser>> GetAllUsersByDepartmentId(int DepartmentId)
         {
-            return await _appDbContext.Users.Where(u => u.Departement_ID==DepartmentId && u.Active==true).ToListAsync();
+            return await _appDbContext.Users.Where(u => u.Departement_ID == DepartmentId && u.Active == true).ToListAsync();
         }
         public async Task<IEnumerable<string>> GetAllRolesOfUser(ApplicationUser user)
         {
@@ -166,7 +165,7 @@ namespace Agazaty.Data.Services.Implementation
                     if (today >= nextJuly1) nextJuly1 = new DateTime(today.Year + 1, 7, 1);
                     int monthsDifference = ((nextJuly1.Year - today.Year) * 12) + nextJuly1.Month - today.Month;
 
-                    NumberOfDaysToBeAdded = (int)Math.Ceiling((NumberOfDaysToBeAdded*1.0) / monthsDifference);
+                    NumberOfDaysToBeAdded = (int)Math.Ceiling((NumberOfDaysToBeAdded * 1.0) / monthsDifference);
 
                     user.NormalLeavesCount += NumberOfDaysToBeAdded * monthsDifference;
 
@@ -204,9 +203,10 @@ namespace Agazaty.Data.Services.Implementation
                     user.CasualLeavesCount = 7;
                     user.HowManyDaysFrom81And47 = 0;
                     user.YearsOfWork++;
-                    if (user.YearsOfWork>=1) { user.NormalLeavesCount = 36; user.LeaveSection = NormalLeaveSection.OneYear; }
-                    if (user.YearsOfWork>=10) { user.NormalLeavesCount = 45; user.LeaveSection = NormalLeaveSection.TenYears; }
+                    if (user.YearsOfWork >= 1) { user.NormalLeavesCount = 36; user.LeaveSection = NormalLeaveSection.OneYear; }
+                    if (user.YearsOfWork >= 10) { user.NormalLeavesCount = 45; user.LeaveSection = NormalLeaveSection.TenYears; }
                     if (user.LeaveSection == NormalLeaveSection.FiftyAge) user.NormalLeavesCount = 60;
+                    if (user.LeaveSection == NormalLeaveSection.DisabilityEmployee) user.NormalLeavesCount = 60;
                     //var hireDuration = (DateTime.UtcNow.Date - user.HireDate).TotalDays;
                     //var age = (user.DateOfBirth - DateTime.UtcNow.Date).TotalDays;
                     //if(age >= 365*50) user.NormalLeavesCount = 60;                       // 50 years age
@@ -241,20 +241,38 @@ namespace Agazaty.Data.Services.Implementation
         {
             var user = _mapper.Map<ApplicationUser>(model);
             user.Active = true;
-            //var hireDuration = (DateTime.UtcNow.Date - user.HireDate).TotalDays;
-
-            var ageInYears = DateTime.UtcNow.Year - user.DateOfBirth.Year;
-            if (DateTime.UtcNow.Month < user.DateOfBirth.Month ||
-               (DateTime.UtcNow.Month == user.DateOfBirth.Month && DateTime.UtcNow.Day < user.DateOfBirth.Day))
+            var init = user.HireDate;
+            var today = DateTime.UtcNow;
+            user.YearsOfWork = today.Year - init.Year;
+            if (init.Month < 7)
             {
-                ageInYears--;
+                user.YearsOfWork++;
             }
-            if (ageInYears >= 50) user.LeaveSection = NormalLeaveSection.FiftyAge;
+            if (today.Month < 7)
+            {
+                user.YearsOfWork--;
+            }
+            if (model.Disability == true)
+            {
+                user.LeaveSection = NormalLeaveSection.DisabilityEmployee;
+            }
             else
             {
-                if (user.YearsOfWork == 0) user.LeaveSection = NormalLeaveSection.NoSection;
-                if (user.YearsOfWork >= 1) user.LeaveSection = NormalLeaveSection.OneYear;
-                if (user.YearsOfWork >= 10) user.LeaveSection = NormalLeaveSection.TenYears;
+                //var hireDuration = (DateTime.UtcNow.Date - user.HireDate).TotalDays;
+                // validation on leaves count from front
+                var ageInYears = DateTime.UtcNow.Year - user.DateOfBirth.Year;
+                if (DateTime.UtcNow.Month < user.DateOfBirth.Month ||
+                   (DateTime.UtcNow.Month == user.DateOfBirth.Month && DateTime.UtcNow.Day < user.DateOfBirth.Day))
+                {
+                    ageInYears--;
+                }
+                if (ageInYears >= 50) user.LeaveSection = NormalLeaveSection.FiftyAge;
+                else
+                {
+                    if (user.YearsOfWork == 0) user.LeaveSection = NormalLeaveSection.NoSection;
+                    if (user.YearsOfWork >= 1) user.LeaveSection = NormalLeaveSection.OneYear;
+                    if (user.YearsOfWork >= 10) user.LeaveSection = NormalLeaveSection.TenYears;
+                }
             }
 
             var result = await _userManager.CreateAsync(user, model.Password);
@@ -295,7 +313,7 @@ namespace Agazaty.Data.Services.Implementation
         public async Task<AuthModel> GetTokenAsync(ApplicationUser user)
         {
             var rolesList = await _userManager.GetRolesAsync(user);
-
+            var roleObject = await _roleManager.FindByNameAsync(rolesList.FirstOrDefault());
             var jwtSecurityToken = await CreateJwtToken(user);
             string tokenString = new JwtSecurityTokenHandler().WriteToken(jwtSecurityToken);
             //user.ActiveToken = tokenString;
@@ -306,11 +324,15 @@ namespace Agazaty.Data.Services.Implementation
                 IsAuthenticated = true,
                 Token = tokenString,
                 //ExpiresOn = jwtSecurityToken.ValidTo,
-                Roles = rolesList.ToList(),
+                RoleName = roleObject.Name,
+                RoleId = roleObject.Id,
+                //Roles = rolesList.ToList(),
                 FullName = $"{user.ForthName} {user.ThirdName} {user.SecondName} {user.FirstName}",
                 NormalLeavesCount = user.NormalLeavesCount,
                 CasualLeavesCount = user.CasualLeavesCount,
-                SickLeavesCount = user.SickLeavesCount
+                SickLeavesCount = user.NonChronicSickLeavesCount,
+                Email = user.Email,
+                Id = user.Id,
             };
             if (user.Departement_ID != null)
             {
@@ -321,22 +343,35 @@ namespace Agazaty.Data.Services.Implementation
         }
         public async Task<IdentityResult> Update(ApplicationUser user)
         {
-            
+            var init = user.HireDate;
+            var today = DateTime.UtcNow;
+            user.YearsOfWork = today.Year - init.Year;
+            if (init.Month < 7)
+            {
+                user.YearsOfWork++;
+            }
+            if (today.Month < 7)
+            {
+                user.YearsOfWork--;
+            }
             return await _userManager.UpdateAsync(user);
         }
         public async Task<IdentityResult> Delete(ApplicationUser user)
         {
             return await _userManager.DeleteAsync(user);
         }
-        public async Task<AuthModel> ForgetPassword(string Email)
+        public async Task<AuthModel> ForgetPassword(SendOTPDTO DTO)
         {
-            var Account = await FindByEmail(Email);
+            var Account = await FindByEmail(DTO.Email);
             if (Account == null)
             {
                 return new AuthModel { Message = "user not found" };
             }
-
-            return await SendOTP(Email);
+            //if (Account.UserName != DTO.UserName)
+            //{
+            //    return new AuthModel { Message = "Invalid Request" };
+            //}
+            return await SendOTP(DTO.Email);
         }
         public async Task<AuthModel> ResetPassword(ResetPasswordDTO DTO)
         {
@@ -345,11 +380,11 @@ namespace Agazaty.Data.Services.Implementation
             {
                 return new AuthModel { Message = "user not found" };
             }
-            if (DTO.token == null || DTO.token != Account.OTP || DateTime.UtcNow > Account.OTPExpiry)
-            {
-                return new AuthModel { Message = "Invalid OTP" };
-            }
-            string NewHashedPassword = _userManager.PasswordHasher.HashPassword(Account, DTO.newPasswod);
+            //if (/*DTO.token == null || DTO.token != Account.OTP ||*/ DateTime.UtcNow > Account.OTPExpiry)
+            //{
+            //    return new AuthModel { Message = "Invalid OTP" };
+            //}
+            string NewHashedPassword = _userManager.PasswordHasher.HashPassword(Account, DTO.newPassword);
             Account.PasswordHash = NewHashedPassword;
             Account.OTP = null;
             Account.OTPExpiry = null;
@@ -395,6 +430,36 @@ namespace Agazaty.Data.Services.Implementation
             };
             await _EmailService.SendEmail(emailrequest);
             return new AuthModel { Email = account.Email, Message = "OTP has been sent to your email" };
+        }
+        public async Task<AuthModel> VerifyOtpAsync(string Email, string enteredOtp)
+        {
+            ApplicationUser? Account = await _userManager.FindByEmailAsync(Email);
+            if (Account == null)
+            {
+                return new AuthModel { Message = "User not found" };
+            }
+            if (enteredOtp == null || enteredOtp != Account.OTP || DateTime.UtcNow > Account.OTPExpiry)
+            {
+                return new AuthModel { Message = "Invalid OTP" };
+            }
+
+            Account.OTP = null;
+            Account.OTPExpiry = null;
+            await _userManager.UpdateAsync(Account);
+
+            var JwtSecurityToken = await CreateJwtToken(Account);
+            new AuthModel { Message = "Invalid OTP" };
+
+            return new AuthModel
+            {
+                //Id = Account.Id,
+                //Email = Account.Email,
+                ////ExpiresOn = JwtSecurityToken.ValidTo,
+                IsAuthenticated = true,
+                ////Roles = await _userManager.GetRolesAsync(Account),
+                //Token = new JwtSecurityTokenHandler().WriteToken(JwtSecurityToken),
+                Message = "Changed"
+            };
         }
     }
 }

@@ -32,8 +32,9 @@ namespace Agazaty.Data.Services.Interfaces
         Task<AuthModel> GetTokenAsync(ApplicationUser user);
         Task<IdentityResult> Update(ApplicationUser user);
         Task<IdentityResult> Delete(ApplicationUser user);
-        Task<AuthModel> ForgetPassword(string Email);
+        Task<AuthModel> ForgetPassword(SendOTPDTO DTO);
         Task<AuthModel> ResetPassword(ResetPasswordDTO DTO);
         Task<AuthModel> SendOTP(string email);
+        Task<AuthModel> VerifyOtpAsync(string Email, string enteredOtp);
     }
 }

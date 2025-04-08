@@ -165,6 +165,11 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(new {Message= "StartDate should be less than EndDate." });
                 }
+                //var LastCasualLeaveForUser = await _base.GetLast(d => d.UserId == model.UserId);
+                //if(LastCasualLeaveForUser.EndDate >= model.StartDate)
+                //{
+                //    return BadRequest("");
+                //}
 
 
                 var casualLeave = _mapper.Map<CasualLeave>(model);

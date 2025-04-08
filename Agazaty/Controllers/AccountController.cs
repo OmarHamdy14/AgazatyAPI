@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.DotNet.Scaffolding.Shared.Messaging;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Security.Claims;
@@ -34,37 +35,44 @@ namespace Agazaty.Controllers
             _deptBase = deptBase;
             _mapper = mapper;
         }
-        
-        [Authorize]
+
+        //[Authorize]
         [HttpPut("Reset-Password")]
         public async Task<IActionResult> ResetPassword(ResetPasswordDTO DTO)
         {
             var result = await _accountService.ResetPassword(DTO);
             return Ok(result);
         }
-        [Authorize]
+        //[Authorize]
         [HttpPost("Forget-Password")]
         public async Task<IActionResult> ForgetPassword(SendOTPDTO DTO)
         {
-            var result = await _accountService.ForgetPassword(DTO.Email);
+            var result = await _accountService.ForgetPassword(DTO);
             return Ok(result);
         }
-        [Authorize]
+        //[Authorize]
         [HttpPost("Send-OTP")]
         public async Task<IActionResult> SendOtp(SendOTPDTO DTO)
         {
             var result = await _accountService.SendOTP(DTO.Email);
             return Ok(result);
         }
-        [Authorize]
+        [HttpPost("Verify-OTP")]
+        public async Task<IActionResult> VerifyOtp(VerifyOTPDTO verifyOtpDTO)
+        {
+            var result = await _accountService.VerifyOtpAsync(verifyOtpDTO.Email, verifyOtpDTO.EnteredOtp);
+            if (!result.IsAuthenticated) return BadRequest(result);
+            return Ok(result);
+        }
+        //[Authorize]
         [HttpPost("Change-Password")]
         public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDTO model)
         {
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var user = await _accountService.FindById(userId);
+            //var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var user = await _accountService.FindById(model.UserId);
             if (user == null)
                 return NotFound("User not found.");
 
@@ -76,9 +84,9 @@ namespace Agazaty.Controllers
             }
             return Ok("Password changed successfully.");
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize]
         [HttpGet("GetUserById/{userID}")]
-        public async Task<IActionResult> GetUserById([FromRoute]string userID)
+        public async Task<IActionResult> GetUserById([FromRoute] string userID)
         {
             if (string.IsNullOrWhiteSpace(userID))
                 return BadRequest(new { message = "Invalid user ID." });
@@ -104,7 +112,28 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize]
+        [HttpGet("GetRoleOfUser/{userID}")]
+        public async Task<IActionResult> GetRoleOfUser([FromRoute] string userID)
+        {
+            if (string.IsNullOrWhiteSpace(userID))
+                return BadRequest(new { message = "Invalid user ID." });
+            try
+            {
+                var user = await _accountService.FindById(userID);
+                if (user == null)
+                {
+                    return NotFound(new { Message = "User is not found." });
+                }
+                var role = await _accountService.GetFirstRole(user);
+                return Ok(new { role });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+            }
+        }
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetUserByNationalId/{NationalId}")]
         public async Task<IActionResult> GetUserByNationalId(string NationalId)
         {
@@ -129,17 +158,17 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetAllActiveUsers")]
         public async Task<IActionResult> GetAllActiveUsers()
         {
             try
             {
                 var users = await _accountService.GetAllActiveUsers();
-                if (!users.Any()) { return NotFound(new { Message = "There Are No Users Found."}); }
+                if (!users.Any()) { return NotFound(new { Message = "There Are No Users Found." }); }
 
                 var ReturnedUsers = _mapper.Map<IEnumerable<UserDTO>>(users);
-                foreach(var ReturnedUser in ReturnedUsers)
+                foreach (var ReturnedUser in ReturnedUsers)
                 {
                     var user = await _accountService.FindById(ReturnedUser.Id);
                     ReturnedUser.FullName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
@@ -156,7 +185,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetAllNonActiveUsers")]
         public async Task<IActionResult> GetAllNonActiveUsers()
         {
@@ -183,7 +212,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpGet("GetAllAvailabelCoworkers/{userId}")]
         public async Task<IActionResult> GetAllAvailableCoworkers(string userId)
         {
@@ -213,19 +242,19 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
         [HttpGet("GetAllUsersByDepartmentId/{DepartmentId}")]
         public async Task<IActionResult> GetAllUsersByDepartmentId(int DepartmentId)
         {
             if (DepartmentId <= 0)
-                return BadRequest(new {Message = "Invalid Department Id."});
+                return BadRequest(new { Message = "Invalid Department Id." });
             try
             {
-                var dept = await _deptBase.Get(d=>d.Id==DepartmentId);
+                var dept = await _deptBase.Get(d => d.Id == DepartmentId);
                 if (dept == null) return NotFound(new { Message = "There is no department found with this id." });
 
                 var users = await _accountService.GetAllUsersByDepartmentId(DepartmentId);
-                if(!users.Any()) return NotFound(new { Message = "There are no users found in this department." });
+                if (!users.Any()) return NotFound(new { Message = "There are no users found in this department." });
 
                 var ReturnedUsers = _mapper.Map<IEnumerable<UserDTO>>(users);
                 foreach (var ReturnedUser in ReturnedUsers)
@@ -244,19 +273,19 @@ namespace Agazaty.Controllers
             {
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
-        }        
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        }
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPost("CreateUser/{RoleName}")]
-        public async Task<IActionResult> CreateUser([FromRoute]string RoleName, [FromBody] CreateUserDTO model) 
+        public async Task<IActionResult> CreateUser([FromRoute] string RoleName, [FromBody] CreateUserDTO model)
         {
             try
             {
                 if (ModelState.IsValid)
                 {
-                    if(RoleName=="عميد الكلية" || RoleName == "أمين الكلية")
+                    if (RoleName == "عميد الكلية" || RoleName == "أمين الكلية" || RoleName == "مدير الموارد البشرية") // ??????????
                     {
                         var list = await _accountService.GetAllUsersInRole(RoleName);
-                        if (list.Any()) return BadRequest(new { Message = $"There is already user has the {RoleName} role, , this role should be only assigned to not more than 1 user." });
+                        if (list.Any()) return BadRequest(new { Message = $"There is already user has the {RoleName} role, this role should be only assigned to not more than 1 user." });
                     }
                     if (await _accountService.FindByEmail(model.Email) is not null)
                         return BadRequest(new { Message = "Email is already registered!" });
@@ -275,8 +304,7 @@ namespace Agazaty.Controllers
                         if (await _deptBase.Get(d => d.Id == model.Departement_ID) is null)
                             return BadRequest(new { Message = "Invalid department!" });
                     }
-
-                    var res = await _accountService.Create(RoleName,model);
+                    var res = await _accountService.Create(RoleName, model);
                     if (res.Succeeded)
                     {
                         var user = await _accountService.FindByNationalId(model.NationalID);
@@ -285,7 +313,7 @@ namespace Agazaty.Controllers
                         {
                             var ReturnedUser = _mapper.Map<UserDTO>(user);
                             ReturnedUser.FullName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
-                            if(user.Departement_ID != null)
+                            if (user.Departement_ID != null)
                             {
                                 var dpt = await _deptBase.Get(d => d.Id == user.Departement_ID);
                                 ReturnedUser.DepartmentName = dpt.Name;
@@ -303,7 +331,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [AllowAnonymous]
+        //[AllowAnonymous]
         [HttpPost("UserLogin")]
         public async Task<IActionResult> Login([FromBody] LogInUserDTO model)
         {
@@ -324,7 +352,7 @@ namespace Agazaty.Controllers
                         await _accountService.TransferingUserNormalLeaveCountToNewSection(user);
                         return Ok(res);
                     }
-                    return Unauthorized(new {Message = res.Message});
+                    return Unauthorized(new { Message = res.Message });
                 }
                 return BadRequest(ModelState);
             }
@@ -333,9 +361,9 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPut("UpdateUser/{userid}/{RoleName}")]
-        public async Task<IActionResult> UdpateUser(string userid, string RoleName, [FromBody]UpdateUserDTO model)
+        public async Task<IActionResult> UdpateUser(string userid, string RoleName, [FromBody] UpdateUserDTO model)
         {
             if (string.IsNullOrWhiteSpace(userid) || string.IsNullOrWhiteSpace(RoleName))
                 return BadRequest(new { message = "Invalid user ID or Role." });
@@ -348,13 +376,16 @@ namespace Agazaty.Controllers
                     var user = await _accountService.FindById(userid);
                     if (user == null) return NotFound(new { Message = "User is not found" });
 
-                    if (RoleName == "عميد الكلية" || RoleName == "أمين الكلية")
+                    if (RoleName == "عميد الكلية" || RoleName == "أمين الكلية" || RoleName == "مدير الموارد البشرية") // ??????????
                     {
                         var list = await _accountService.GetAllUsersInRole(RoleName);
-                        var manager = list.FirstOrDefault();    
-                        if (manager != null)
+                        if (list.Any())
                         {
-                            if (manager.Id != userid) return BadRequest(new { Message = $"There is already user has the {RoleName} role, this role should be only assigned to not more than 1 user." });
+                            var manager = list.FirstOrDefault();
+                            if (manager != null)
+                            {
+                                if (manager.Id != userid) return BadRequest(new { Message = $"There is already user has the {RoleName} role, this role should be only assigned to not more than 1 user." });
+                            }
                         }
                     }
                     var u = await _accountService.FindByEmail(model.Email);
@@ -388,6 +419,26 @@ namespace Agazaty.Controllers
                     }
 
                     _mapper.Map(model, user);
+                    if (model.Disability == true)
+                    {
+                        user.LeaveSection = NormalLeaveSection.DisabilityEmployee;
+                    }
+                    else
+                    {
+                        var ageInYears = DateTime.UtcNow.Year - user.DateOfBirth.Year;
+                        if (DateTime.UtcNow.Month < user.DateOfBirth.Month ||
+                           (DateTime.UtcNow.Month == user.DateOfBirth.Month && DateTime.UtcNow.Day < user.DateOfBirth.Day))
+                        {
+                            ageInYears--;
+                        }
+                        if (ageInYears >= 50) user.LeaveSection = NormalLeaveSection.FiftyAge;
+                        else
+                        {
+                            if (user.YearsOfWork == 0) user.LeaveSection = NormalLeaveSection.NoSection;
+                            if (user.YearsOfWork >= 1) user.LeaveSection = NormalLeaveSection.OneYear;
+                            if (user.YearsOfWork >= 10) user.LeaveSection = NormalLeaveSection.TenYears;
+                        }
+                    }
 
                     var res = await _accountService.Update(user);
                     if (res.Succeeded)
@@ -404,9 +455,9 @@ namespace Agazaty.Controllers
                         if (user.Departement_ID != null)
                         {
                             var dpt = await _deptBase.Get(d => d.Id == user.Departement_ID);
-                            if(dpt!=null) ReturnedUser.DepartmentName = dpt.Name;
+                            if (dpt != null) ReturnedUser.DepartmentName = dpt.Name;
                         }
-                        return Ok(new { Message = "Update is succeeded" , User = ReturnedUser });
+                        return Ok(new { Message = "Update is succeeded", User = ReturnedUser });
                     }
                     return BadRequest(res.Errors);
                 }
@@ -418,7 +469,7 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize]
+        //[Authorize]
         [HttpPut("UdpateUserForUser/{userid}")]
         public async Task<IActionResult> UdpateUserForUser(string userid, [FromBody] UpdateUserDTOforuser model)
         {
@@ -442,11 +493,14 @@ namespace Agazaty.Controllers
 
                     user.Email = model.Email;
                     user.PhoneNumber = model.PhoneNumber;
+                    user.Street = model.Street;
+                    user.Governorate = model.Governorate;
+                    user.State = model.State;
 
                     var res = await _accountService.Update(user);
                     if (res.Succeeded)
                     {
-                        return Ok(new { Message = "Update is succeeded"});
+                        return Ok(new { Message = "Update is succeeded" });
                     }
                     return BadRequest(res.Errors);
                 }
@@ -458,9 +512,9 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
-        [HttpDelete("DeleteUser/{userid}")]
-        public async Task<IActionResult> DeleteUser(string userid)
+        //[Authorize(Roles = "مدير الموارد البشرية")]
+        [HttpPut("SoftDeleteUser/{userid}")]
+        public async Task<IActionResult> SoftDeleteUser(string userid)
         {
             if (string.IsNullOrWhiteSpace(userid))
                 return BadRequest(new { message = "Invalid user ID." });
@@ -469,13 +523,64 @@ namespace Agazaty.Controllers
                 var user = await _accountService.FindById(userid);
                 if (user != null)
                 {
+                    var roleName = await _accountService.GetFirstRole(user);
+                    if (roleName == "عميد الكلية" || roleName == "أمين الكلية" || roleName == "مدير الموارد البشرية") // ??????????
+                    {
+                        return BadRequest(new { Message = $"This user has {roleName} role. Before deleting this user, you should assign {roleName} role to new user." });
+                    }
                     var IsDeptHead = await _deptBase.Get(d => d.ManagerId == user.Id);
                     if (IsDeptHead != null)
                     {
                         return BadRequest(new { Message = $"This user is {IsDeptHead.Name} department manager, you should assign a new manager to this department before deleting this user." });
                     }
-                    user.Active = false;
-                    return Ok(new { Message = "Deletion is succeeded" });
+                    if (user.Active)
+                    {
+                        user.Active = false;
+                        await _accountService.Update(user);
+                        return Ok(new { Message = "Deletion is succeeded" });
+                    }
+                    else
+                    {
+                        return BadRequest(new { Message = "User is already not activiated" });
+                    }
+
+
+                    //var res = await _accountService.Delete(user);
+                    //if (res.Succeeded)
+                    //{
+                    //    return Ok(new { Message = "Deletion is succeeded" });
+                    //}
+                    //return BadRequest(res.Errors);
+                }
+                return NotFound(new { Message = "User is not found" });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+            }
+        }
+        //[Authorize(Roles = "مدير الموارد البشرية")]
+        [HttpPut("ReActiveUser/{userid}")]
+        public async Task<IActionResult> ReActiveUser(string userid)
+        {
+            if (string.IsNullOrWhiteSpace(userid))
+                return BadRequest(new { message = "Invalid user ID." });
+            try
+            {
+                var user = await _accountService.FindById(userid);
+                if (user != null)
+                {
+                    if (!user.Active)
+                    {
+                        user.Active = true;
+                        await _accountService.Update(user);
+                        return Ok(new { Message = "Reactivation is succeeded" });
+                    }
+                    else
+                    {
+                        return BadRequest(new { Message = "User is already activiated" });
+                    }
+
                     //var res = await _accountService.Delete(user);
                     //if (res.Succeeded)
                     //{
@@ -492,4 +597,3 @@ namespace Agazaty.Controllers
         }
     }
 }
-

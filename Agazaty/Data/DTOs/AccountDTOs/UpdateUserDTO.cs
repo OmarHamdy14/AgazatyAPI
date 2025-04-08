@@ -36,11 +36,9 @@ namespace Agazaty.Data.DTOs.AccountDTOs
         public DateTime DateOfBirth { get; set; }
         [Required]
         public int position { get; set; }
-        [Range(0, int.MaxValue)]
         public int NormalLeavesCount { get; set; }
-        [Range(0, int.MaxValue)]
         public int CasualLeavesCount { get; set; }
-        public int SickLeavesCount { get; set; }
+        public int NonChronicSickLeavesCount { get; set; }
         public int HistoryNormalLeavesCount { get; set; }
         public int? Departement_ID { get; set; }
         [DefaultValue(0)]
@@ -54,6 +52,10 @@ namespace Agazaty.Data.DTOs.AccountDTOs
         [DefaultValue(0)]
         public int HowManyDaysFrom81And47 { get; set; }
         [DefaultValue(0)]
-        public int YearsOfWork { get; set; }
+        public string? Street { get; set; }
+        public string? governorate { get; set; }
+        public string? State { get; set; }
+        public bool Disability { get; set; }
+
     }
 }

@@ -37,7 +37,28 @@ namespace Agazaty.Data.Base
                 }
             }
             return await query.FirstOrDefaultAsync();
+        }
+        public async Task<T> GetLast(Expression<Func<T, bool>> filter, string? includeProp = null, bool tracked = false)
+        {
 
+            IQueryable<T> query;
+            if (tracked)
+            {
+                query = dbSet;
+            }
+            else
+            {
+                query = dbSet.AsNoTracking();
+            }
+            query = query.Where(filter);
+            if (!string.IsNullOrEmpty(includeProp))
+            {
+                foreach (var prop in includeProp.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    query = query.Include(prop);
+                }
+            }
+            return await query.LastOrDefaultAsync();
         }
         public async Task<IEnumerable<T>> GetAll(Expression<Func<T, bool>>? filter = null, string? includeProp = null)
         {
