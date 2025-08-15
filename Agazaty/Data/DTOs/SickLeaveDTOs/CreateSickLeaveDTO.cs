@@ -1,4 +1,6 @@
-﻿namespace Agazaty.Data.DTOs.SickLeaveDTOs
+﻿using Agazaty.Models;
+
+namespace Agazaty.Data.DTOs.SickLeaveDTOs
 {
     public class CreateSickLeaveDTO
     {
@@ -6,4 +8,5 @@
         public string EmployeeAddress { get; set; }
         public string UserID { get; set; }
     }
+    IEnumerable<ApplicationUser> coworkers = new();
 }

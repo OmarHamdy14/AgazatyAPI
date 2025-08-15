@@ -105,6 +105,7 @@ namespace Agazaty.Controllers
                     var dept = await _deptBase.Get(d => d.Id == user.Departement_ID);
                     ReturnedUser.DepartmentName = dept.Name;
                 }
+                
                 return Ok(ReturnedUser);
             }
             catch (Exception ex)
@@ -373,6 +374,7 @@ namespace Agazaty.Controllers
             {
                 if (ModelState.IsValid)
                 {
+                    
                     var user = await _accountService.FindById(userid);
                     if (user == null) return NotFound(new { Message = "User is not found" });
 

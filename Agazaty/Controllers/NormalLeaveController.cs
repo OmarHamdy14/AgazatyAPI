@@ -553,18 +553,38 @@ namespace Agazaty.Controllers
                     var Dean = res.FirstOrDefault();
                     if (Dean == null) { return BadRequest(new { Message = "There no user with the Dean role" }); }
                     normalLeave.General_ManagerID = Dean.Id;
-                    /////
-                    var IsManagerOfDepartment = await _departmentBase.Get(d => d.Id == user.Departement_ID);
+
+
+                    // >>>>>>>>>>>>>>>>>>>>>>>>>>>  add this
+                    var IsManagerOfDepartment = await _departmentBase.Get(d => d.ManagerId == user.Id);
                     if (IsManagerOfDepartment != null)
                     {
                         normalLeave.Direct_ManagerID = Dean.Id;
                     }
                     else
                     {
-                        var DepartmentofUser = await _departmentBase.Get(dm => dm.Id == user.Departement_ID);
-                        if (DepartmentofUser == null) { return BadRequest(new { Message = "This user doesn't have a department, so user doesn't have a direct manager." }); }
-                        normalLeave.Direct_ManagerID = DepartmentofUser.ManagerId;
+                        //if (DepartmentofUser == null) { return BadRequest(new { Message = "This user doesn't have a department, so user doesn't have a direct manager." }); }
+                        if (user.Departement_ID == null) normalLeave.Direct_ManagerID = Dean.Id;
+                        else
+                        {
+                            var DepartmentofUser = await _departmentBase.Get(dm => dm.Id == user.Departement_ID);
+                            if(DepartmentofUser == null)
+                            {
+                                normalLeave.Direct_ManagerID = Dean.Id;
+                            }
+                            else if (DepartmentofUser.ManagerId == null)  // القسم ليس له رئيس
+                            {
+                                normalLeave.Direct_ManagerID = Dean.Id;
+                            }
+                            else
+                            {
+                                var manager = await _accountService.FindById(DepartmentofUser.ManagerId);
+                                if (manager == null) normalLeave.Direct_ManagerID = Dean.Id;
+                                else normalLeave.Direct_ManagerID = DepartmentofUser.ManagerId;
+                            }                           
+                        }
                     }
+                    // >>>>>>>>>>>>>>>>>>>>>>>>>>>
                 }
                 else if (await _accountService.IsInRoleAsync(user, "موظف"))
                 {
@@ -1090,6 +1110,12 @@ namespace Agazaty.Controllers
 
                     // if Head of Departement made a leave request
                     // if أمين الكلية made a leave request
+
+                    // >>>>>>>>>>>>>>>>>>>>>>>>>>>  add this
+                    if (NormalLeave.Direct_ManagerID == NormalLeave.General_ManagerID) NormalLeave.DirectManager_Decision = true;
+                    // >>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+
                     var userr = await _accountService.FindById(NormalLeave.UserID);
                     var IsdeptManager = await _departmentBase.Get(d => d.ManagerId == userr.Id);
                     bool cheackRole = await _accountService.IsInRoleAsync(userr, "أمين الكلية");

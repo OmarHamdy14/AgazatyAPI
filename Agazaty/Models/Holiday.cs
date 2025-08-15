@@ -1,10 +1,13 @@
-﻿namespace Agazaty.Models
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace Agazaty.Models
 {
     public class Holiday
     {
-        public int Id { get; set; }
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
         public string Name { get; set; }
-        public DateTime StartDate { get; set; }
-        public string EndDate { get; set; }
+        public DateTime Date { get; set; }
+
     }
 }

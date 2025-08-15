@@ -32,7 +32,9 @@ namespace Agazaty.Controllers
         {
             try
             {
-                var holidays = await _base.GetAll();
+                var holiday = await _base.Get(h => h.Date == Date);
+                if (holiday == null) leaveDays++;
+                var holidays = await _baseHoliday.GetAll(h => h.Date.Year == DateTime.UtcNow.Year);
                 if (!holidays.Any())
                 {
                     return NotFound("No holidays found.");
@@ -80,14 +82,23 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(ModelState);
                 }
-
+                var holiday = await _base.Get(h => h.Date.Date == model.Date);
+                if (holiday != null)
+                {
+                    return NotFound(new { Message = "There is holiday already with this date." });
+                }
+                var role = await _accountService.GetFirstRole(user);
                 var holiday = _mapper.Map<Holiday>(model);
                 await _base.Add(holiday);
 
-                var AllNormalLeaves = await _normalLeavebase.GetAll();
+                var AllNormalLeaves = await _normalLeavebase.GetAll(l => l.StartDate.Year == holiday.Date.Year);
                 foreach(var leave in AllNormalLeaves)
                 {
-
+                    if(leave.StartDate >= model.Date && leave.EndDate <= model.Date)
+                    {
+                        var user = await _accountService.FindById(leave.UserID);
+                        user.NormalLeavesCount++;
+                    }
                 }
                 return CreatedAtAction(nameof(GetHolidayById), new { holidayID = holiday.Id }, holiday);
             }
@@ -116,13 +127,29 @@ namespace Agazaty.Controllers
                 {
                     return NotFound(new { Message = "Holiday is not found." });
                 }
+                else // old date wrong
+                {
+                    var AllNormalLeaves1 = await _normalLeavebase.GetAll(l => l.StartDate.Year == holiday.Date.Year);
+                    foreach (var leave in AllNormalLeaves1)
+                    {
+                        if (leave.StartDate >= holiday.Date && leave.EndDate <= holiday.Date)
+                        {
+                            var user = await _accountService.FindById(leave.UserID);
+                            user.NormalLeavesCount--;
+                        }
+                    }
+                }
                 _mapper.Map(model, holiday);
                 await _base.Update(holiday);
 
-                var AllNormalLeaves = await _normalLeavebase.GetAll();
+                var AllNormalLeaves = await _normalLeavebase.GetAll(l => l.StartDate.Year == holiday.Date.Year);  // new date
                 foreach (var leave in AllNormalLeaves)
                 {
-
+                    if (leave.StartDate >= holiday.Date && leave.EndDate <= holiday.Date)
+                    {
+                        var user = await _accountService.FindById(leave.UserID);
+                        user.NormalLeavesCount++;
+                    }
                 }
 
                 return Ok(new { Message = $"Holiday has been successfully updated.", Holiday = holiday });
@@ -150,6 +177,16 @@ namespace Agazaty.Controllers
                     return NotFound($"No holiday found.");
                 }
                 await _base.Remove(holiday);
+
+                var AllNormalLeaves = await _normalLeavebase.GetAll(l => l.StartDate.Year == holiday.Date.Year);
+                foreach (var leave in AllNormalLeaves)
+                {
+                    if (leave.StartDate >= holiday.Date && leave.EndDate <= holiday.Date)
+                    {
+                        var user = await _accountService.FindById(leave.UserID);
+                        user.NormalLeavesCount--;
+                    }
+                }
                 return Ok($"Holiday has been successfully deleted.");
             }
             catch (Exception ex)

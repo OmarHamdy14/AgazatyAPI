@@ -7,8 +7,8 @@ namespace Agazaty.Models
 {
     public class NormalLeave
     {
-        [Required]
-        public int ID { get; set; }
+        [Key]
+        public Guid ID { get; set; } = Guid.NewGuid();
         [ForeignKey("User")]
         [Required]
         public string UserID { get; set; }
@@ -24,6 +24,7 @@ namespace Agazaty.Models
         public DateTime StartDate { get; set; }
         [Required]
         public DateTime EndDate { get; set; }
+        public int Days { get; set; }
         public string? NotesFromEmployee { get; set; }
         public int Year { get; set; }
         public bool Accepted { get; set; } = false;
@@ -37,5 +38,7 @@ namespace Agazaty.Models
         public LeaveStatus LeaveStatus { get; set; }
         public Holder Holder { get; set; }
         public RejectedBy RejectedBy { get; set; }
+        //public string LeaveType { get; set; } = "اعتيادية";
+
     }
 }

@@ -3,7 +3,6 @@
     public class CreateHolidayDTO
     {
         public string Name { get; set; }
-        public DateTime StartDate { get; set; }
-        public string EndDate { get; set; }
+        public DateTime Date { get; set; }
     }
 }
