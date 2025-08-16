@@ -17,7 +17,7 @@ namespace Agazaty.Data.Services.Interfaces
         Task<IEnumerable<ApplicationUser>> GetAllNonActiveUsers();
         Task<IEnumerable<ApplicationUser>> GetAllActiveAvailableCoworkers(ApplicationUser user);
         Task<IEnumerable<ApplicationUser>> GetAllUsersInRole(string RoleName);
-        Task<IEnumerable<ApplicationUser>> GetAllUsersByDepartmentId(int DepartmentId);
+        Task<IEnumerable<ApplicationUser>> GetAllUsersByDepartmentId(Guid DepartmentId);
         Task<IEnumerable<string>> GetAllRolesOfUser(ApplicationUser user);
         Task<string> GetFirstRole(ApplicationUser user);
         Task<string> GetDeanORSupervisor(string RoleName);
@@ -32,9 +32,9 @@ namespace Agazaty.Data.Services.Interfaces
         Task<AuthModel> GetTokenAsync(ApplicationUser user);
         Task<IdentityResult> Update(ApplicationUser user);
         Task<IdentityResult> Delete(ApplicationUser user);
-        Task<AuthModel> ForgetPassword(SendOTPDTO DTO);
-        Task<AuthModel> ResetPassword(ResetPasswordDTO DTO);
-        Task<AuthModel> SendOTP(string email);
-        Task<AuthModel> VerifyOtpAsync(string Email, string enteredOtp);
+        Task<ForgetPassResponse> ForgetPassword(SendOTPDTO DTO);
+        Task<ForgetPassResponse> ResetPassword(ResetPasswordDTO DTO);
+        Task<ForgetPassResponse> SendOTP(string email);
+        Task<ForgetPassResponse> VerifyOtpAsync(string Email, string enteredOtp);
     }
 }

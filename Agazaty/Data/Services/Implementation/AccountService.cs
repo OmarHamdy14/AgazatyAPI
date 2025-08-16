@@ -17,6 +17,7 @@ using Microsoft.IdentityModel.Tokens;
 using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Principal;
 using System.Text;
 
 namespace Agazaty.Data.Services.Implementation
@@ -97,21 +98,69 @@ namespace Agazaty.Data.Services.Implementation
             var role = (await GetAllRolesOfUser(user)).FirstOrDefault();
             if (role == "عميد الكلية")
             {
-                var coworkers = await GetAllUsersInRole("هيئة تدريس");
-                var supervisor = (await GetAllUsersInRole("أمين الكلية")).Where(u => u.Active == true).FirstOrDefault();
-                coworkers.Append(supervisor);
-                return coworkers;
+                var coworkers = (await GetAllUsersInRole("هيئة تدريس"))
+                 .Where(u => u.position == 2 && u.Active == true && u.Id != user.Id);
+
+                var supervisor = (await GetAllUsersInRole("أمين الكلية"))
+                                .Where(u => u.Active == true && u.Id != user.Id)
+                                .FirstOrDefault();
+                // هنا خزنا نتيجة الـ Append
+                var allUsers = coworkers.Append(supervisor); // supervisor حتى لو null هيتضاف
+
+                return allUsers;
             }
             else if (role == "أمين الكلية")
             {
-                var coworkers = await GetAllUsersInRole("موظف");
-                var dean = (await GetAllUsersInRole("عميد الكلية")).Where(u => u.Active == true).FirstOrDefault();
-                coworkers.Append(dean);
-                return coworkers;
+                var coworkers = (await GetAllUsersInRole("موظف"))
+                .Where(u => u.position == 2 && u.Active == true && u.Id != user.Id);
+
+                var supervisor = (await GetAllUsersInRole("عميد الكلية"))
+                                .Where(u => u.Active == true && u.Id != user.Id)
+                                .FirstOrDefault();
+
+                // هنا خزنا نتيجة الـ Append
+                var allUsers = coworkers.Append(supervisor); // supervisor حتى لو null هيتضاف
+
+                return allUsers;
+            }
+            else if (role == "مدير الموارد البشرية")
+            {
+                var coworkers = (await GetAllUsersInRole("موظف"))
+                .Where(u => u.position == 2 && u.Active == true && u.Id != user.Id);
+
+                var supervisor = (await GetAllUsersInRole("أمين الكلية"))
+                                .Where(u => u.Active == true && u.Id != user.Id)
+                                .FirstOrDefault();
+
+                // هنا خزنا نتيجة الـ Append
+                var allUsers = coworkers.Append(supervisor); // supervisor حتى لو null هيتضاف
+
+                return allUsers;
+
             }
             else
             {
-                var coworkers = (await GetAllUsersInRole(role)).Where(u => u.position <= user.position && u.Active == true);
+                var coworkers = (await GetAllUsersInRole(role)).Where(u => u.position <= user.position && u.Active == true && u.Id != user.Id);
+                if (role == "هيئة تدريس")
+                {
+                    var supervisor = (await GetAllUsersInRole("عميد الكلية"))
+                               .Where(u => u.Active == true && u.Id != user.Id)
+                               .FirstOrDefault();
+                    var allUsers = coworkers.Append(supervisor); // supervisor حتى لو null هيتضاف
+                    return allUsers;
+                }
+                else if (role == "موظف")
+                {
+                    var supervisor = (await GetAllUsersInRole("أمين الكلية"))
+                                .Where(u => u.Active == true && u.Id != user.Id)
+                                .FirstOrDefault();
+                    var HR = (await GetAllUsersInRole("مدير الموارد البشرية"))
+                                .Where(u => u.Active == true && u.Id != user.Id)
+                                .FirstOrDefault();
+                    var allUsers = coworkers.Append(supervisor); // supervisor حتى لو null هيتضاف
+                    allUsers = coworkers.Append(HR); // supervisor حتى لو null هيتضاف
+                    return allUsers;
+                }
                 return coworkers;
             }
         }
@@ -119,7 +168,7 @@ namespace Agazaty.Data.Services.Implementation
         {
             return (await _userManager.GetUsersInRoleAsync(RoleName)).Where(u => u.Active == true);
         }
-        public async Task<IEnumerable<ApplicationUser>> GetAllUsersByDepartmentId(int DepartmentId)
+        public async Task<IEnumerable<ApplicationUser>> GetAllUsersByDepartmentId(Guid DepartmentId)
         {
             return await _appDbContext.Users.Where(u => u.Departement_ID == DepartmentId && u.Active == true).ToListAsync();
         }
@@ -333,6 +382,8 @@ namespace Agazaty.Data.Services.Implementation
                 SickLeavesCount = user.NonChronicSickLeavesCount,
                 Email = user.Email,
                 Id = user.Id,
+                Position = user.position,
+                Active = user.Active
             };
             if (user.Departement_ID != null)
             {
@@ -360,12 +411,12 @@ namespace Agazaty.Data.Services.Implementation
         {
             return await _userManager.DeleteAsync(user);
         }
-        public async Task<AuthModel> ForgetPassword(SendOTPDTO DTO)
+        public async Task<ForgetPassResponse> ForgetPassword(SendOTPDTO DTO)
         {
             var Account = await FindByEmail(DTO.Email);
             if (Account == null)
             {
-                return new AuthModel { Message = "user not found" };
+                return new ForgetPassResponse { Message = "لم يتم العثور على المستخدم." };
             }
             //if (Account.UserName != DTO.UserName)
             //{
@@ -373,12 +424,12 @@ namespace Agazaty.Data.Services.Implementation
             //}
             return await SendOTP(DTO.Email);
         }
-        public async Task<AuthModel> ResetPassword(ResetPasswordDTO DTO)
+        public async Task<ForgetPassResponse> ResetPassword(ResetPasswordDTO DTO)
         {
             var Account = await FindByEmail(DTO.email);
             if (Account == null)
             {
-                return new AuthModel { Message = "user not found" };
+                return new ForgetPassResponse { Message = "لم يتم العثور على المستخدم." };
             }
             //if (/*DTO.token == null || DTO.token != Account.OTP ||*/ DateTime.UtcNow > Account.OTPExpiry)
             //{
@@ -396,9 +447,9 @@ namespace Agazaty.Data.Services.Implementation
                 {
                     errors += $"{error.Description} , ";
                 }
-                return new AuthModel { Message = errors };
+                return new ForgetPassResponse { Message = errors };
             }
-            return new AuthModel { Message = "Password Changed successfully" };
+            return new ForgetPassResponse { Email = Account.Email, Message = "تم تغيير كلمة المرور بنجاح.", IsAuthenticated = true };
             //var result=await _UserManager.ResetPasswordAsync(user, token, NewPassword);
         }
         private string GenerateOTP()
@@ -407,16 +458,16 @@ namespace Agazaty.Data.Services.Implementation
             string randomNumber = random.Next(0, 1000000).ToString("D6");
             return randomNumber;
         }
-        public async Task<AuthModel> SendOTP(string email)
+        public async Task<ForgetPassResponse> SendOTP(string email)
         {
             var account = await FindByEmail(email);
             if (account == null)
             {
-                return new AuthModel { Message = "account not found." };
+                return new ForgetPassResponse { Message = "الحساب غير موجود." };
             }
             if (account.OTP != null && account.OTPExpiry > DateTime.UtcNow)
             {
-                return new AuthModel { Message = "there is already otp sent" };
+                return new ForgetPassResponse { Email = account.Email, Message = "تم إرسال الرقم السري بالفعل." };
             }
             string OTP = GenerateOTP();
             account.OTP = OTP;
@@ -425,22 +476,36 @@ namespace Agazaty.Data.Services.Implementation
             var emailrequest = new EmailRequest
             {
                 Email = account.Email,
-                Subject = "Your OTP",
-                Body = $"Your OTP is {OTP}"
+                Subject = "الكود السري الخاص بك",
+                Body = $@"
+                <div style='font-family: Arial; direction: rtl; text-align: right; border: 2px solid #2E86C1; border-radius: 10px; padding: 20px; max-width: 500px; margin: auto;'>
+                    <h3>مرحبًا،</h3>
+                    <p>الكود السري الخاص بك هو:</p>
+                    <div style='text-align: center; margin: 20px 0;'>
+                        <span style='display: inline-block; padding: 10px 20px; border: 2px solid #2E86C1; border-radius: 8px; font-size: 24px; color: #2E86C1;'>
+                            {OTP}
+                        </span>
+                    </div>
+                    <p>يرجى عدم مشاركة هذا الكود مع أي شخص.</p>
+                    <br/>
+                    <p>مع تحيات،<br/>فريق دعم اجازاتي</p>
+                </div>"
             };
+
             await _EmailService.SendEmail(emailrequest);
-            return new AuthModel { Email = account.Email, Message = "OTP has been sent to your email" };
+
+            return new ForgetPassResponse { Email = account.Email, IsAuthenticated = true, Message = "تم إرسال الرقم السري إلى بريدك الإلكتروني." };
         }
-        public async Task<AuthModel> VerifyOtpAsync(string Email, string enteredOtp)
+        public async Task<ForgetPassResponse> VerifyOtpAsync(string Email, string enteredOtp)
         {
             ApplicationUser? Account = await _userManager.FindByEmailAsync(Email);
             if (Account == null)
             {
-                return new AuthModel { Message = "User not found" };
+                return new ForgetPassResponse { Message = "لم يتم العثور على المستخدم." };
             }
             if (enteredOtp == null || enteredOtp != Account.OTP || DateTime.UtcNow > Account.OTPExpiry)
             {
-                return new AuthModel { Message = "Invalid OTP" };
+                return new ForgetPassResponse { Email = Account.Email, Message = "الرقم السري غير صحيح." };
             }
 
             Account.OTP = null;
@@ -448,9 +513,9 @@ namespace Agazaty.Data.Services.Implementation
             await _userManager.UpdateAsync(Account);
 
             var JwtSecurityToken = await CreateJwtToken(Account);
-            new AuthModel { Message = "Invalid OTP" };
+            //new AuthModel { Message = "Invalid OTP" };
 
-            return new AuthModel
+            return new ForgetPassResponse
             {
                 //Id = Account.Id,
                 //Email = Account.Email,
@@ -458,7 +523,8 @@ namespace Agazaty.Data.Services.Implementation
                 IsAuthenticated = true,
                 ////Roles = await _userManager.GetRolesAsync(Account),
                 //Token = new JwtSecurityTokenHandler().WriteToken(JwtSecurityToken),
-                Message = "Changed"
+                Message = "الرقم السري صحيح.",
+                Email = Account.Email
             };
         }
     }

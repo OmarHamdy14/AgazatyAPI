@@ -33,7 +33,7 @@ namespace Agazaty.Data.Services.Implementation
         }
         public async Task<IdentityResult> CreateRole(CreateRoleDTO model)
         {
-            IdentityRole role = _mapper.Map<IdentityRole>(model);   
+            IdentityRole role = _mapper.Map<IdentityRole>(model);
             var res = await _roleManager.CreateAsync(role);
             return res;
         }
