@@ -1,4 +1,5 @@
 ﻿using Agazaty.Data.Base;
+using Agazaty.Data.DTOs.AccountDTOs;
 using Agazaty.Data.DTOs.CasualLeaveDTOs;
 using Agazaty.Data.DTOs.DepartmentDTOs;
 using Agazaty.Data.Services.Interfaces;
@@ -25,7 +26,7 @@ namespace Agazaty.Controllers
             _base = Ebase;
             _accountService = accountService;
         }
-        //[Authorize(Roles = "مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية,عميد الكلية")]
         [HttpGet("GetAllDepartments")]
         public async Task<IActionResult> GetAllDepartments()
         {
@@ -50,11 +51,12 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "مدير الموارد البشرية")]
-        [HttpGet("GetDepartmentById/{departmentID:int}")]
-        public async Task<IActionResult> GetDepartmentById(int departmentID)
+
+        [Authorize(Roles = "مدير الموارد البشرية")]
+        [HttpGet("GetDepartmentById/{departmentID:guid}")]
+        public async Task<IActionResult> GetDepartmentById(Guid departmentID)
         {
-            if (departmentID <= 0)
+            if (departmentID == Guid.Empty)
             {
                 return BadRequest(new { Message = "معرّف القسم غير صالح." });
             }
@@ -77,35 +79,88 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "مدير الموارد البشرية")]
+        [Authorize]
+        [HttpGet("GetAllAvailableForDeptCreation/{roleName}")]
+        public async Task<IActionResult> GetAllAvailableForDeptCreation(string roleName)
+        {
+            try
+            {
+                var users = await _accountService.GetAllUsersInRole(roleName);
+                if (roleName == "هيئة تدريس")
+                {
+                    var supervisor = (await _accountService.GetAllUsersInRole("عميد الكلية"))
+                               .Where(u => u.Active == true)
+                               .FirstOrDefault();
+                    var allUsers = users.Append(supervisor); // supervisor حتى لو null هيتضاف
+                    var ReturnedUsers = _mapper.Map<IEnumerable<UserDTO>>(allUsers);
+                    foreach (var ReturnedUser in ReturnedUsers)
+                    {
+                        var user = await _accountService.FindById(ReturnedUser.Id);
+                        ReturnedUser.FullName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                        ReturnedUser.RoleName = await _accountService.GetFirstRole(user);
+                    }
+                    return Ok(ReturnedUsers);
+                }
+                else if (roleName == "موظف")
+                {
+                    var supervisor = (await _accountService.GetAllUsersInRole("أمين الكلية"))
+                                .Where(u => u.Active == true)
+                                .FirstOrDefault();
+                    var HR = (await _accountService.GetAllUsersInRole("مدير الموارد البشرية"))
+                                .Where(u => u.Active == true)
+                                .FirstOrDefault();
+                    var allUsers = users.Append(supervisor); // supervisor حتى لو null هيتضاف
+                    allUsers = users.Append(HR); // supervisor حتى لو null هيتضاف
+                    var ReturnedUsers = _mapper.Map<IEnumerable<UserDTO>>(allUsers);
+                    foreach (var ReturnedUser in ReturnedUsers)
+                    {
+                        var user = await _accountService.FindById(ReturnedUser.Id);
+                        ReturnedUser.FullName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                        ReturnedUser.RoleName = await _accountService.GetFirstRole(user);
+                    }
+
+                    return Ok(ReturnedUsers);
+                }
+                var ReturnedUserss = _mapper.Map<IEnumerable<UserDTO>>(users);
+                foreach (var ReturnedUser in ReturnedUserss)
+                {
+                    var user = await _accountService.FindById(ReturnedUser.Id);
+                    ReturnedUser.FullName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    ReturnedUser.RoleName = await _accountService.GetFirstRole(user);
+                }
+                return Ok(ReturnedUserss);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
+            }
+        }
+
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPost("CreateDepartment")]
         public async Task<IActionResult> CreateDepartment([FromBody] CreateDepartmentDTO model)
         {
 
             try
             {
-                if (model == null)
-                {
-                    return BadRequest("بيانات القسم غير صالحة.");
-                }
                 if (!ModelState.IsValid)
                 {
                     return BadRequest(ModelState);
+                }
+                if (model == null)
+                {
+                    return BadRequest("بيانات القسم غير صالحة.");
                 }
                 var res = await _accountService.FindById(model.ManagerId);
                 if (res == null)
                 {
                     return NotFound(new { Message = "معرّف المستخدم غير موجود." });
                 }
-
-
-                var UserRole = await _accountService.GetFirstRole(res);    
-                if(UserRole=="عميد الكلية" || UserRole=="أمين الكلية")
+                var UserRole = await _accountService.GetFirstRole(res);
+                if (UserRole == "عميد الكلية" || UserRole == "أمين الكلية")
                 {
                     return BadRequest(new { Message = "لا يمكن ان يكون عميد الكلية او أمين الكلية رؤساء لاقسام" });
                 }
-
-
                 // to check : is user whose id is equal model.managerid exists in another department ?
                 var IsExistsInAnotherDepartment = await _base.Get(d => d.Id == res.Departement_ID);
                 if (IsExistsInAnotherDepartment != null) // this means that user exists in another department
@@ -132,11 +187,11 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "مدير الموارد البشرية")]
-        [HttpPut("UpdateDepartment/{departmentID:int}")]
-        public async Task<IActionResult> UpdateDepartment([FromRoute] int departmentID, [FromBody] UpdateDepartmentDTO model)
+        [Authorize(Roles = "مدير الموارد البشرية")]
+        [HttpPut("UpdateDepartment/{departmentID:guid}")]
+        public async Task<IActionResult> UpdateDepartment([FromRoute] Guid departmentID, [FromBody] UpdateDepartmentDTO model)
         {
-            if (departmentID <= 0)
+            if (departmentID == Guid.Empty)
             {
                 return BadRequest("بيانات القسم غير صالحة.");
             }
@@ -152,13 +207,11 @@ namespace Agazaty.Controllers
                 {
                     return NotFound(new { Message = "معرّف المستخدم غير موجود." });
                 }
-
-                var UserRole = await _accountService.GetFirstRole(res);    // add this !!!!
+                var UserRole = await _accountService.GetFirstRole(res);
                 if (UserRole == "عميد الكلية" || UserRole == "أمين الكلية")
                 {
                     return BadRequest(new { Message = "لا يمكن ان يكون عميد الكلية او أمين الكلية رؤساء لاقسام" });
                 }
-
                 var department = await _base.Get(d => d.Id == departmentID);
                 if (department == null)
                 {
@@ -194,11 +247,11 @@ namespace Agazaty.Controllers
                 return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
-        //[Authorize(Roles = "مدير الموارد البشرية")]
-        [HttpDelete("DeleteDepartment/{departmentID:int}")]
-        public async Task<IActionResult> DeleteDepartment(int departmentID)
+        [Authorize(Roles = "مدير الموارد البشرية")]
+        [HttpDelete("DeleteDepartment/{departmentID:guid}")]
+        public async Task<IActionResult> DeleteDepartment(Guid departmentID)
         {
-            if (departmentID <= 0)
+            if (departmentID == Guid.Empty)
             {
                 return BadRequest(new { Message = "معرّف القسم غير صالح." });
             }
