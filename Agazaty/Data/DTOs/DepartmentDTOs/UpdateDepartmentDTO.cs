@@ -12,5 +12,7 @@ namespace Agazaty.Data.DTOs.DepartmentDTOs
         public DateTime CreateDate { get; set; }
         [Required]
         public string ManagerId { get; set; }
+        public bool DepartmentType { get; set; }
+
     }
 }

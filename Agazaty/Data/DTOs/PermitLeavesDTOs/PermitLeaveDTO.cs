@@ -5,11 +5,17 @@ namespace Agazaty.Data.DTOs.PermitLeavesDTOs
 {
     public class PermitLeaveDTO
     {
-        public int Id { get; set; }
+        public Guid Id { get; set; }
         public double Hours { get; set; }
         [Required]
         public DateTime Date { get; set; }
+        public bool Active { get; set; }
         public string UserName { get; set; }
-        public string UserId { get; set; }
+        public string UserID { get; set; }
+        public string FirstName { get; set; }
+        public string SecondName { get; set; }
+        public string LeaveType { get; set; } = "تصريح";
+
+
     }
 }
