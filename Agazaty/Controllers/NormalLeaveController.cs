@@ -14,6 +14,9 @@ using NormalLeaveTask.Models;
 using System.Data;
 using static System.Net.WebRequestMethods;
 using System.Security.Principal;
+using System.Runtime.InteropServices;
+using Agazaty.Data.DTOs.AccountDTOs;
+using System.Globalization;
 
 namespace Agazaty.Controllers
 {
@@ -27,7 +30,8 @@ namespace Agazaty.Controllers
         private readonly IMapper _mapper;
         private readonly AppDbContext _appDbContext;
         private readonly IEmailService _EmailService;
-        public NormalLeaveController(AppDbContext appDbContext, IEntityBaseRepository<NormalLeave> Ebase, IAccountService accountService, IMapper mapper, IEntityBaseRepository<Department> departmentBase, IEmailService EmailService)
+        private readonly ILeaveValidationService _leaveValidationService;
+        public NormalLeaveController(AppDbContext appDbContext, IEntityBaseRepository<NormalLeave> Ebase, IAccountService accountService, IMapper mapper, IEntityBaseRepository<Department> departmentBase, IEmailService EmailService, ILeaveValidationService leaveValidationService)
         {
             _base = Ebase;
             _accountService = accountService;
@@ -35,20 +39,59 @@ namespace Agazaty.Controllers
             _appDbContext = appDbContext;
             _departmentBase = departmentBase;
             _EmailService = EmailService;
+            _leaveValidationService = leaveValidationService;
+        }
+        //private static Dictionary<int, List<DateTime>> officialHolidaysByYear = new Dictionary<int, List<DateTime>>();
+        // //✅ 1. إدخال الإجازات الرسمية لسنة معينة من الـ HR
+        //[HttpPost("add-holidays/{year}")]
+        //public IActionResult AddOfficialHolidays(int year, [FromBody] List<DateTime> holidays)
+        //{
+        //    if (!officialHolidaysByYear.ContainsKey(year))
+        //    {
+        //        officialHolidaysByYear[year] = new List<DateTime>();
+        //    }
+
+        //    officialHolidaysByYear[year].AddRange(holidays);
+        //    return Ok(new { message = $"تمت إضافة الإجازات الرسمية لسنة {year} بنجاح!", holidays });
+        //}
+        //// ✅ 2. عرض الإجازات الرسمية لسنة معينة
+        //[HttpGet("holidays/{year}")]
+        //public IActionResult GetOfficialHolidays(int year)
+        //{
+        //    if (!officialHolidaysByYear.ContainsKey(year))
+        //    {
+        //        return NotFound(new { message = $"لا توجد إجازات مسجلة لسنة {year}." });
+        //    }
+
+        //    return Ok(new { year, holidays = officialHolidaysByYear[year] });
+        //}
+
+        private string ToArabicDigits(string input)
+        {
+            char[] arabicDigits = { '٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩' };
+            var result = new System.Text.StringBuilder();
+            foreach (char c in input)
+            {
+                if (char.IsDigit(c))
+                    result.Append(arabicDigits[c - '0']);
+                else
+                    result.Append(c);
+            }
+            return result.ToString();
         }
         [Authorize]
-        [HttpGet("GetNormalLeaveById/{leaveID:int}")]
-        public async Task<IActionResult> GetNormalLeaveById(int leaveID)
+        [HttpGet("GetNormalLeaveById/{leaveID:guid}")]
+        public async Task<IActionResult> GetNormalLeaveById(Guid leaveID)
         {
-            if (leaveID <= 0)
-                return BadRequest(new { message = "Invalid leave ID." });
+            if (leaveID == Guid.Empty)
+                return BadRequest(new { message = "معرف الإجازة غير صالح." });
             try
             {
 
                 var NormalLeave = await _base.Get(n => n.ID == leaveID);
                 if (NormalLeave == null)
                 {
-                    return NotFound(new { message = "No normal leave found." });
+                    return NotFound(new { message = "لم يتم العثور على إجازة اعتيادية." });
                 }
 
                 var leave = _mapper.Map<NormalLeaveDTO>(NormalLeave);
@@ -59,15 +102,57 @@ namespace Agazaty.Controllers
                 leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
                 leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
                 leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                leave.PhoneNumber = user.PhoneNumber;
+                var department = await _departmentBase.Get(d => d.Id == user.Departement_ID);
+                if (department != null)
+                {
+                    leave.DepartmentName = department.Name;
+                }
                 leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
+                leave.FirstName = user.FirstName;
+                leave.SecondName = user.SecondName;
                 return Ok(leave);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        [Authorize(Roles = "مدير الموارد البشرية,عميد الكلية")]
+        [HttpGet("GetAllNormalLeaves")]
+        public async Task<IActionResult> GetAllNormalLeaves()
+        {
+            try
+            {
+
+                var NormalLeaves = await _base.GetAll();
+                if (!NormalLeaves.Any())
+                {
+                    return NotFound(new { message = "لم يتم العثور على أي إجازات اعتيادية." });
+                }
+                var leaves = new List<NormalLeaveDTO>();
+                foreach (var normalleave in NormalLeaves)
+                {
+                    var leave = _mapper.Map<NormalLeaveDTO>(normalleave);
+                    var user = await _accountService.FindById(normalleave.UserID);
+                    var coworker = await _accountService.FindById(normalleave.Coworker_ID);
+                    var generalManager = await _accountService.FindById(normalleave.General_ManagerID); ;
+                    var directManager = await _accountService.FindById(normalleave.Direct_ManagerID);
+                    leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                    leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
+
+                    leaves.Add(leave);
+                }
+                return Ok(leaves);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
+            }
+        }
+        [Authorize]
         [HttpGet("GetAllAcceptedNormalLeaves")]
         public async Task<IActionResult> GetAllAcceptedNormalLeaves()
         {
@@ -77,7 +162,7 @@ namespace Agazaty.Controllers
                 var NormalLeaves = await _base.GetAll(n => n.Accepted == true && n.ResponseDone == true);
                 if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = "No accepted normal leaves found." });
+                    return NotFound(new { message = "لم يتم العثور على أي إجازات اعتيادية مقبولة." });
                 }
                 var leaves = new List<NormalLeaveDTO>();
                 foreach (var normalleave in NormalLeaves)
@@ -98,10 +183,10 @@ namespace Agazaty.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية")]
+        [Authorize]
         [HttpGet("GetAllRejectedNormalLeaves")]
         public async Task<IActionResult> GetAllRejectedNormalLeaves()
         {
@@ -110,7 +195,7 @@ namespace Agazaty.Controllers
                 var NormalLeaves = await _base.GetAll(n => n.Accepted == false && n.ResponseDone == true);
                 if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = "No rejected normal leaves found." });
+                    return NotFound(new { message = "لم يتم العثور على أي إجازات اعتيادية مرفوضة." });
                 }
                 var leaves = new List<NormalLeaveDTO>();
                 foreach (var normalleave in NormalLeaves)
@@ -131,7 +216,40 @@ namespace Agazaty.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
+            }
+        }
+        [Authorize]
+        [HttpGet("GetAllWaitingNormalLeaves")]
+        public async Task<IActionResult> GetAllWaitingNormalLeaves()
+        {
+            try
+            {
+                var NormalLeaves = await _base.GetAll(n => n.LeaveStatus == LeaveStatus.Waiting);
+                if (!NormalLeaves.Any())
+                {
+                    return NotFound(new { message = "لم يتم العثور على أي إجازات اعتيادية في انتظار الموافقة." });
+                }
+                var leaves = new List<NormalLeaveDTO>();
+                foreach (var normalleave in NormalLeaves)
+                {
+                    var leave = _mapper.Map<NormalLeaveDTO>(normalleave);
+                    var user = await _accountService.FindById(normalleave.UserID);
+                    var coworker = await _accountService.FindById(normalleave.Coworker_ID);
+                    var generalManager = await _accountService.FindById(normalleave.General_ManagerID); ;
+                    var directManager = await _accountService.FindById(normalleave.Direct_ManagerID);
+                    leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
+                    leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
+                    leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
+
+                    leaves.Add(leave);
+                }
+                return Ok(leaves);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
             }
         }
         [Authorize]
@@ -139,14 +257,13 @@ namespace Agazaty.Controllers
         public async Task<IActionResult> GetAllNormalLeavesByUserID(string userID)
         {
             if (string.IsNullOrWhiteSpace(userID))
-                return BadRequest(new { message = "Invalid user ID." });
+                return BadRequest(new { message = "معرف المستخدم غير صالح." });
             try
             {
-
                 var NormalLeaves = await _base.GetAll(n => n.UserID == userID);
                 if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = "No normal leaves found." });
+                    return NotFound(new { message = "لم يتم العثور على أي إجازات اعتيادية." });
                 }
                 var leaves = new List<NormalLeaveDTO>();
                 foreach (var normalleave in NormalLeaves)
@@ -167,7 +284,7 @@ namespace Agazaty.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
             }
         }
         [Authorize]
@@ -175,7 +292,7 @@ namespace Agazaty.Controllers
         public async Task<IActionResult> GetAllAcceptedNormalLeavesByUserID(string userID)
         {
             if (string.IsNullOrWhiteSpace(userID))
-                return BadRequest(new { message = "Invalid user ID." });
+                return BadRequest(new { message = "معرف المستخدم غير صالح." });
             try
             {
 
@@ -184,7 +301,7 @@ namespace Agazaty.Controllers
                     n.ResponseDone == true);
                 if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = "No accepted normal leaves found." });
+                    return NotFound(new { message = "لم يتم العثور على أي إجازات اعتيادية مقبولة." });
                 }
                 var leaves = new List<NormalLeaveDTO>();
                 foreach (var normalleave in NormalLeaves)
@@ -205,7 +322,7 @@ namespace Agazaty.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
             }
         }
         [Authorize]
@@ -217,11 +334,11 @@ namespace Agazaty.Controllers
                 var errors = new List<string>();
                 int currentYear = DateTime.Now.Year;
                 if (string.IsNullOrWhiteSpace(userID))
-                    errors.Add("Invalid user ID.");
+                    errors.Add("معرف المستخدم غير صالح.");
                 if (year < 1900)
-                    errors.Add("Invalid year.");
+                    errors.Add("السنة غير صالحة.");
                 else if (year > currentYear)
-                    errors.Add($"Year cannot be older than the current year ({currentYear}).");
+                    errors.Add($"لا يمكن أن تكون السنة أحدث من السنة الحالية ({currentYear}).");
                 if (errors.Any())
                     return BadRequest(new { messages = errors });
 
@@ -232,7 +349,7 @@ namespace Agazaty.Controllers
                     n.ResponseDone == true);
                 if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = $"No accepted normal leaves found in {year}." });
+                    return NotFound(new { message = $"لم يتم العثور على أي إجازات اعتيادية مقبولة في سنة {year}." });
                 }
                 var leaves = new List<NormalLeaveDTO>();
                 foreach (var normalleave in NormalLeaves)
@@ -253,7 +370,7 @@ namespace Agazaty.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
             }
         }
         [Authorize]
@@ -261,7 +378,7 @@ namespace Agazaty.Controllers
         public async Task<IActionResult> GetAllRejectedNormalLeavesByUserID(string userID)
         {
             if (string.IsNullOrWhiteSpace(userID))
-                return BadRequest(new { message = "Invalid user ID." });
+                return BadRequest(new { message = "معرف المستخدم غير صالح." });
             try
             {
 
@@ -271,7 +388,7 @@ namespace Agazaty.Controllers
                     n.ResponseDone == true);
                 if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = "No rejected normal leaves found." });
+                    return NotFound(new { message = "لم يتم العثور على أي إجازات اعتيادية مرفوضة." });
                 }
                 var leaves = new List<NormalLeaveDTO>();
                 foreach (var normalleave in NormalLeaves)
@@ -292,7 +409,7 @@ namespace Agazaty.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
             }
         }
         [Authorize]
@@ -300,7 +417,7 @@ namespace Agazaty.Controllers
         public async Task<IActionResult> GetAllWaitingNormalLeavesByUserID(string userID)
         {
             if (string.IsNullOrWhiteSpace(userID))
-                return BadRequest(new { message = "Invalid user ID." });
+                return BadRequest(new { message = "معرف المستخدم غير صالح." });
             try
             {
 
@@ -309,7 +426,7 @@ namespace Agazaty.Controllers
                     n.ResponseDone == false);
                 if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = "No waiting normal leaves found." });
+                    return NotFound(new { message = "لم يتم العثور على أي إجازات اعتيادية في انتظار الموافقة." });
                 }
 
                 var leaves = new List<NormalLeaveDTO>();
@@ -331,7 +448,7 @@ namespace Agazaty.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
             }
         }
         [Authorize(Roles = "عميد الكلية,أمين الكلية")]
@@ -339,7 +456,7 @@ namespace Agazaty.Controllers
         public async Task<IActionResult> GetAllWaitingNormalLeavesByGeneral_ManagerID(string general_managerID)
         {
             if (string.IsNullOrWhiteSpace(general_managerID))
-                return BadRequest(new { message = "Invalid general manager ID." });
+                return BadRequest(new { message = "معرف المدير المختص غير صالح." });
             try
             {
 
@@ -351,7 +468,7 @@ namespace Agazaty.Controllers
                     n.ResponseDone == false);
                 if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = "No waiting normal leaves found." });
+                    return NotFound(new { message = "لا يوجد أي إجازات اعتيادية في الانتظار." });
                 }
 
                 var leaves = new List<NormalLeaveDTO>();
@@ -366,7 +483,9 @@ namespace Agazaty.Controllers
                     leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
                     leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
                     leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
-
+                    leave.PhoneNumber = user.PhoneNumber;
+                    var department = await _departmentBase.Get(d => d.Id == user.Departement_ID);
+                    leave.DepartmentName = department.Name;
                     leaves.Add(leave);
                 }
                 return Ok(leaves);
@@ -374,7 +493,7 @@ namespace Agazaty.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
             }
         }
         [Authorize]
@@ -382,7 +501,7 @@ namespace Agazaty.Controllers
         public async Task<IActionResult> GetAllWaitingNormalLeavesByDirect_ManagerID(string direct_managerID)
         {
             if (string.IsNullOrWhiteSpace(direct_managerID))
-                return BadRequest(new { message = "Invalid direct manager ID." });
+                return BadRequest(new { message = "معرف المدير المباشر غير صالح." });
             try
             {
 
@@ -393,7 +512,7 @@ namespace Agazaty.Controllers
                     n.ResponseDone == false);
                 if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = "No waiting normal leaves found." });
+                    return NotFound(new { message = "لا يوجد أي إجازات اعتيادية في الانتظار." });
                 }
 
                 var leaves = new List<NormalLeaveDTO>();
@@ -408,14 +527,16 @@ namespace Agazaty.Controllers
                     leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
                     leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
                     leave.CoworkerName = $"{coworker.FirstName} {coworker.SecondName} {coworker.ThirdName} {coworker.ForthName}";
-
+                    leave.PhoneNumber = user.PhoneNumber;
+                    var department = await _departmentBase.Get(d => d.Id == user.Departement_ID);
+                    leave.DepartmentName = department.Name;
                     leaves.Add(leave);
                 }
                 return Ok(leaves);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
             }
         }
         [Authorize]
@@ -423,7 +544,7 @@ namespace Agazaty.Controllers
         public async Task<IActionResult> GetAllWaitingNormalLeavesByCoWorkerID(string coworkerID)
         {
             if (string.IsNullOrWhiteSpace(coworkerID))
-                return BadRequest(new { message = "Invalid coworker ID." });
+                return BadRequest(new { message = "معرف القائم بالعمل غير صالح." });
             try
             {
 
@@ -432,7 +553,7 @@ namespace Agazaty.Controllers
                     n.ResponseDone == false && n.CoWorker_Decision == false);
                 if (!NormalLeaves.Any())
                 {
-                    return NotFound(new { message = "No waiting normal leaves found." });
+                    return NotFound(new { message = "لا يوجد أي إجازات اعتيادية في الانتظار." });
                 }
 
                 var leaves = new List<NormalLeaveDTO>();
@@ -454,7 +575,7 @@ namespace Agazaty.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
             }
         }
         [Authorize]
@@ -463,50 +584,238 @@ namespace Agazaty.Controllers
         {
             return Ok(LeaveTypes.res);
         }
+        [Authorize(Roles = "مدير الموارد البشرية")]
+        [HttpPost("MinusOrAddNormalLeavesToUser/{UserID}")]
+        public async Task<IActionResult> MinusOrAddNormalLeavesToUser(string UserID, [FromBody] MinusOrAddNormalLeavesToUser model)
+        {
+            var User = await _accountService.FindById(UserID);
+            var UserNameForEmail = $"{User.FirstName} {User.SecondName} {User.ThirdName} {User.ForthName}";
+
+            var UserGender = (User.Gender == "ذكر") ? "عزيزي" : "عزيزتي";
+
+            if (string.IsNullOrWhiteSpace(UserID))
+                return BadRequest(new { message = "معرف المستخدم غير صالح." });
+            try
+            {
+                var user = await _accountService.FindById(UserID);
+                if (user == null)
+                {
+                    return NotFound(new { message = "لا يوجد مستخدم بهذا المعرف." });
+                }
+                string dayText = model.Days == 1 ? "يوم" : "أيام";
+                if (model.Decision)
+                {
+                    user.NormalLeavesCount += model.Days;
+
+                    var emailrequest = new EmailRequest
+                    {
+                        Email = user.Email,
+                        Subject = $"تم إضافة عدد {ToArabicDigits(model.Days.ToString())} أيام لرصيد اجازاتك",
+                        // حساب صيغة الأيام
+
+                        Body = $@"
+                            <!DOCTYPE html>
+                            <html lang='ar'>
+                            <head>
+                              <meta charset='UTF-8'>
+                              <style>
+                                body {{
+                                  font-family: 'Tahoma', sans-serif;
+                                  direction: rtl;
+                                  unicode-bidi: plaintext;
+                                  background-color: #f9f9f9;
+                                  padding: 20px;
+                                }}
+                                .container {{
+                                  max-width: 600px;
+                                  margin: auto;
+                                  background-color: #ffffff;
+                                  border: 1px solid #00ff00;
+                                  border-radius: 8px;
+                                  padding: 30px;
+                                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+                                  text-align: right;
+                                }}
+                                h2 {{
+                                  color: #00b300;
+                                  text-align: center;
+                                }}
+                                p {{
+                                  font-size: 16px;
+                                  color: #333333;
+                                  line-height: 1.6;
+                                }}
+                                .footer {{
+                                  margin-top: 30px;
+                                  text-align: center;
+                                  font-size: 14px;
+                                  color: #777777;
+                                }}
+                                .highlight {{
+                                  color: #27ae60;
+                                  font-weight: bold;
+                                }}
+                              </style>
+                            </head>
+                            <body>
+                              <div class='container'>
+                                <h2>إشعار بزيادة رصيد اجازتك</h2>
+                            
+                                <p>{UserGender}: {UserNameForEmail}</p>
+                                <p>
+                                  تمت إضافة <span class='highlight'>{ToArabicDigits(model.Days.ToString())}</span>  أيام لرصيد اجازاتك <br />
+                                  السبب: <span class='highlight'>{ToArabicDigits(model.Notes.ToString())}</span>
+                                </p>
+                                <p>لأي استفسار، يرجى التواصل معنا على الرقم: <strong>٠١١٢٧٤٧١١٨٨</strong></p>
+                                <div class='footer'>
+                                  مع تحياتنا<br />
+                                  فريق دعم إجازاتي
+                                </div>
+                              </div>
+                            </body>
+                            </html>"
+                    };
+
+                    await _EmailService.SendEmail(emailrequest);
+                }
+                else
+                {
+                    user.NormalLeavesCount -= model.Days;
+                    var emailrequest = new EmailRequest
+                    {
+                        Email = user.Email,
+                        // Subject=$"تم خصم عدد {ToArabicDigits(model.Days.ToString())}أيام من رصيد اجازاتك",
+                        Subject = $"تم خصم عدد {ToArabicDigits(model.Days.ToString())} أيام من رصيد اجازاتك",
+                        Body = $@"
+                        <!DOCTYPE html>
+                        <html lang='ar'>
+                        <head>
+                          <meta charset='UTF-8'>
+                          <style>
+                            body {{
+                              font-family: 'Tahoma', sans-serif;
+                              direction: rtl;
+                              unicode-bidi: plaintext;
+                              background-color: #f9f9f9;
+                              padding: 20px;
+                            }}
+                            .container {{
+                              max-width: 600px;
+                              margin: auto;
+                              background-color: #ffffff;
+                              border: 1px solid #ff0000;
+                              border-radius: 8px;
+                              padding: 30px;
+                              box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+                              text-align: right;
+                            }}
+                            h2 {{
+                              color: #c0392b;
+                              text-align: center;
+                            }}
+                            p {{
+                              font-size: 16px;
+                              color: #333333;
+                              line-height: 1.6;
+                            }}
+                            .footer {{
+                              margin-top: 30px;
+                              text-align: center;
+                              font-size: 14px;
+                              color: #777777;
+                            }}
+                            .highlight {{
+                              color: #e74c3c;
+                              font-weight: bold;
+                            }}
+                          </style>
+                        </head>
+                        <body>
+                          <div class='container'>
+                            <h2>إشعار بخصم من رصيد اجازاتك</h2>
+                            
+                            <p>{UserGender}: {UserNameForEmail}</p>
+
+                            <p>
+                              تم خصم <span class='highlight'>{ToArabicDigits(model.Days.ToString())}</span> من رصيد اجازاتك <br />
+                              السبب: <span class='highlight'>{ToArabicDigits(model.Notes.ToString())}</span>
+                            </p>
+                            <p>لأي استفسار، يرجى التواصل معنا على الرقم: <strong>٠١١٢٧٤٧١١٨٨</strong></p>
+                            <div class='footer'>
+                              مع تحياتنا<br />
+                              فريق دعم إجازاتي
+                            </div>
+                          </div>
+                        </body>
+                        </html>"
+                    };
+
+                    await _EmailService.SendEmail(emailrequest);
+                }
+                await _accountService.Update(user);
+
+
+                return Ok(new { message = "تم تنفيذ طلبك بنجاح." });
+
+
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
+            }
+
+        }
         [Authorize]
         [HttpPost("CreateNormalLeave")]
         public async Task<IActionResult> CreateNormalLeave([FromBody] CreateNormalLeaveDTO model)
         {
             try
             {
-                if (model == null)
-                {
-                    return BadRequest(new { message = "Invalid normal leave data." });
-                }
                 if (!ModelState.IsValid)
                 {
                     return BadRequest(ModelState);
                 }
-                var cowrker = await _accountService.FindById(model.Coworker_ID);
-                var user = await _accountService.FindById(model.UserID);
-                if (model.Coworker_ID == model.UserID || user == null || cowrker == null)
+                if (model == null)
                 {
-                    return BadRequest(new { Message = "Invalid user id or coworker id." });
+                    return BadRequest(new { message = "بيانات الإجازة الاعتيادية غير صالحة." });
                 }
-
-                if (((model.EndDate - model.StartDate).TotalDays + 1) > user.NormalLeavesCount + user.NormalLeavesCount_81Before1Years + user.NormalLeavesCount_81Before2Years + user.NormalLeavesCount_81Before3Years + user.NormalLeavesCount_47)
-                {
-                    return BadRequest(new { Message = "no enough days" });
-                }
-
-                int DifferenceDays = (int)(model.EndDate - model.StartDate).TotalDays + 1 - user.NormalLeavesCount;
-                if (user.HowManyDaysFrom81And47 + DifferenceDays > 60)
-                {
-                    return BadRequest(new { Message = "You can't because the limit to you are 60 days." });
-                }
-
-
-                var errors = new List<string>();
-                DateTime today = DateTime.Today;
-                int year = DateTime.Now.Year;
-
                 // Check if the user already has a pending leave request
                 bool hasPendingLeave = _appDbContext.NormalLeaves
                 .Any(l => l.UserID == model.UserID && l.ResponseDone == false);
                 if (hasPendingLeave)
                 {
-                    return BadRequest(new { message = "You already have a pending leave request that has not been processed yet." });
+                    return BadRequest(new { message = "لديك بالفعل طلب إجازة قيد الانتظار لم يتم الرد عليه بعد." });
                 }
+                if (await _leaveValidationService.IsSameLeaveOverlapping(model.UserID, model.StartDate, model.EndDate, "NormalLeave"))
+                {
+                    return BadRequest("لديك بالفعل إجازة اعتيادية في هذه الفترة.");
+                }
+                if (await _leaveValidationService.IsLeaveOverlapping(model.UserID, model.StartDate, model.EndDate, "NormalLeave"))
+                {
+                    return BadRequest("لديك بالفعل إجازة من نوع آخر في هذه الفترة.");
+                }
+                var cowrker = await _accountService.FindById(model.Coworker_ID);
+                var user = await _accountService.FindById(model.UserID);
+                if (model.Coworker_ID == model.UserID || user == null || cowrker == null)
+                {
+                    return BadRequest(new { Message = "معرف المستخدم أو معرف القائم بالعمل غير صالح." });
+                }
+                int LeaveDays = await _leaveValidationService.CalculateLeaveDays(model.StartDate, model.EndDate);
+                if (LeaveDays > user.NormalLeavesCount + user.NormalLeavesCount_81Before1Years + user.NormalLeavesCount_81Before2Years + user.NormalLeavesCount_81Before3Years + user.NormalLeavesCount_47)
+                {
+                    return BadRequest(new { Message = "لا يوجد أيام كافية." });
+                }
+
+                int DifferenceDays = LeaveDays - user.NormalLeavesCount;
+                if (user.HowManyDaysFrom81And47 + DifferenceDays > 60)
+                {
+                    return BadRequest(new { Message = "لا يمكنك طلب إجازة لأنك قد تجاوزت الحد الأقصى البالغ 60 يومًا وفقًا لقانوني الخدمة المدنية رقم 81 و47." });
+                }
+
+                var errors = new List<string>();
+                DateTime today = DateTime.Today;
+                int year = DateTime.Now.Year;
+
 
                 // Check if the new leave period overlaps with any existing approved leave
                 bool hasOverlappingLeave = _appDbContext.NormalLeaves
@@ -515,10 +824,8 @@ namespace Agazaty.Controllers
                 // This ensures that the new leave period does NOT completely fall outside an existing leave period
                 if (hasOverlappingLeave)
                 {
-                    return BadRequest(new { message = "Your requested leave period overlaps with an existing approved leave." });
+                    return BadRequest(new { message = "فترة الإجازة التي طلبتها تتداخل مع فترة إجازة معتمدة موجودة." });
                 }
-
-
                 user.TakenNormalLeavesCount = 0;
                 user.TakenNormalLeavesCount_47 = 0;
                 user.TakenNormalLeavesCount_81Before1Years = 0;
@@ -526,35 +833,66 @@ namespace Agazaty.Controllers
                 user.TakenNormalLeavesCount_81Before3Years = 0;
 
                 //validation on year
+                if (model.StartDate.Date == DateTime.UtcNow.Date)
+                {
+                    DateTime currentTime = DateTime.UtcNow; // Or use request timestamp
+                    var UserRole = await _accountService.GetFirstRole(user);
+
+                    if (UserRole == "موظف")
+                    {
+                        if (user.position == 1)
+                        {
+
+                            // Define cutoff time (8:30 AM)
+                            TimeSpan cutoffTime = new TimeSpan(8, 30, 0); // 8:30 AM
+
+                            if (currentTime.TimeOfDay > cutoffTime)
+                            {
+                                // Reject if current time is 8:30 AM or later
+                                return BadRequest(new { message = "يُسمح فقط للموظفين الإداريين وهيئة التدريس بتقديم الطلبات في أو قبل الساعة 8:30 صباحًا." });
+                            }
+                        }
+                        else
+                        {
+                            // Define cutoff time (7:30 AM)
+                            TimeSpan cutoffTime = new TimeSpan(7, 30, 0); // 7:30 AM
+
+                            if (currentTime.TimeOfDay > cutoffTime)
+                            {
+                                // Reject if current time is 7:30 AM or later
+                                return BadRequest(new { message = "يُسمح للموظفين غير الإداريين بتقديم الطلبات في أو قبل الساعة 7:30 صباحًا فقط." });
+                            }
+                        }
+                    }
+                }
                 if (model.EndDate < today)
-                    errors.Add("The leave period has already passed. Please select future dates.");
+                    errors.Add("تاريخ النهاية لا يمكن أن يكون في الماضي، الرجاء اختيار تاريخ مستقبلي.");
 
                 if (model.StartDate < today)
-                    errors.Add("The start date cannot be in the past. Please select today or a future date.");
+                    errors.Add("تاريخ البدء لا يمكن أن يكون في الماضي، الرجاء اختيار تاريخ مستقبلي.");
 
                 if (model.StartDate > model.EndDate)
-                    errors.Add("Start date cannot be after the end date.");
+                    errors.Add("تاريخ البدء لا يمكن أن يكون بعد تاريخ النهاية.");
 
                 if (DateTime.UtcNow.Date > model.StartDate)
-                    errors.Add("Request date cannot be after the start date.");
+                    errors.Add("تاريخ الطلب لا يمكن أن يكون بعد تاريخ البدء.");
 
                 if (errors.Any())
                     return BadRequest(new { messages = errors });
 
                 var normalLeave = _mapper.Map<NormalLeave>(model);
-                normalLeave.RequestDate = DateTime.UtcNow.Date;
+                normalLeave.RequestDate = DateTime.UtcNow.AddHours(3);
                 normalLeave.Year = normalLeave.RequestDate.Year;
                 normalLeave.LeaveStatus = LeaveStatus.Waiting;
                 normalLeave.Holder = Holder.CoWorker;
                 normalLeave.RejectedBy = RejectedBy.NotRejected;
+                normalLeave.Days = LeaveDays;
                 if (await _accountService.IsInRoleAsync(user, "هيئة تدريس"))
                 {
                     var res = await _accountService.GetAllUsersInRole("عميد الكلية");
                     var Dean = res.FirstOrDefault();
-                    if (Dean == null) { return BadRequest(new { Message = "There no user with the Dean role" }); }
+                    if (Dean == null) { return BadRequest(new { Message = "لا يوجد مستخدم لديه دور العميد." }); }
                     normalLeave.General_ManagerID = Dean.Id;
-
-
                     // >>>>>>>>>>>>>>>>>>>>>>>>>>>  add this
                     var IsManagerOfDepartment = await _departmentBase.Get(d => d.ManagerId == user.Id);
                     if (IsManagerOfDepartment != null)
@@ -568,7 +906,7 @@ namespace Agazaty.Controllers
                         else
                         {
                             var DepartmentofUser = await _departmentBase.Get(dm => dm.Id == user.Departement_ID);
-                            if(DepartmentofUser == null)
+                            if (DepartmentofUser == null)
                             {
                                 normalLeave.Direct_ManagerID = Dean.Id;
                             }
@@ -581,36 +919,62 @@ namespace Agazaty.Controllers
                                 var manager = await _accountService.FindById(DepartmentofUser.ManagerId);
                                 if (manager == null) normalLeave.Direct_ManagerID = Dean.Id;
                                 else normalLeave.Direct_ManagerID = DepartmentofUser.ManagerId;
-                            }                           
+                            }
                         }
                     }
                     // >>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+                    //var DepartmentofUser = await _departmentBase.Get(dm => dm.Id == user.Departement_ID);
+                    //if (DepartmentofUser == null) { return BadRequest(new { Message = "هذا المستخدم ليس لديه قسم، لذلك ليس لديه مدير مباشر." }); }
+                    //normalLeave.Direct_ManagerID = DepartmentofUser.ManagerId;
                 }
                 else if (await _accountService.IsInRoleAsync(user, "موظف"))
                 {
                     var res = await _accountService.GetAllUsersInRole("أمين الكلية");
                     var Supervisor = res.FirstOrDefault();
-                    if (Supervisor == null) { return BadRequest(new { Message = "There no user with the Supervisor role" }); }
+                    if (Supervisor == null) { return BadRequest(new { Message = "لا يوجد مستخدم لديه دور أمين كلية." }); }
                     normalLeave.General_ManagerID = Supervisor.Id;
-
-                    var IsManagerOfDepartment = await _departmentBase.Get(d => d.Id == user.Departement_ID);
+                    // >>>>>>>>>>>>>>>>>>>>>>>>>>>  add this
+                    var IsManagerOfDepartment = await _departmentBase.Get(d => d.ManagerId == user.Id);
                     if (IsManagerOfDepartment != null)
                     {
                         normalLeave.Direct_ManagerID = Supervisor.Id;
                     }
                     else
                     {
-                        var DepartmentofUser = await _departmentBase.Get(dm => dm.Id == user.Departement_ID);
-                        if (DepartmentofUser == null) { return BadRequest(new { Message = "This user doesn't have a department, so user doesn't have a direct manager." }); }
-                        normalLeave.Direct_ManagerID = DepartmentofUser.ManagerId;
+                        //if (DepartmentofUser == null) { return BadRequest(new { Message = "This user doesn't have a department, so user doesn't have a direct manager." }); }
+                        if (user.Departement_ID == null) normalLeave.Direct_ManagerID = Supervisor.Id;
+                        else
+                        {
+                            var DepartmentofUser = await _departmentBase.Get(dm => dm.Id == user.Departement_ID);
+                            if (DepartmentofUser == null)
+                            {
+                                normalLeave.Direct_ManagerID = Supervisor.Id;
+                            }
+                            else if (DepartmentofUser.ManagerId == null)  // القسم ليس له رئيس
+                            {
+                                normalLeave.Direct_ManagerID = Supervisor.Id;
+                            }
+                            else
+                            {
+                                var manager = await _accountService.FindById(DepartmentofUser.ManagerId);
+                                if (manager == null) normalLeave.Direct_ManagerID = Supervisor.Id;
+                                else normalLeave.Direct_ManagerID = DepartmentofUser.ManagerId;
+                            }
+                        }
                     }
+                    // >>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+                    //var DepartmentofUser = await _departmentBase.Get(dm => dm.Id == user.Departement_ID);
+                    //if (DepartmentofUser == null) { return BadRequest(new { Message = "هذا المستخدم ليس لديه قسم، لذلك ليس لديه مدير مباشر." }); }
+                    //normalLeave.Direct_ManagerID = DepartmentofUser.ManagerId;
                 }
                 else if (await _accountService.IsInRoleAsync(user, "أمين الكلية"))
                 {
                     // if أمين الكلية made a leave request
                     var res = await _accountService.GetAllUsersInRole("عميد الكلية");
                     var Dean = res.FirstOrDefault();
-                    if (Dean == null) { return BadRequest(new { Message = "There no user with the Dean role" }); }
+                    if (Dean == null) { return BadRequest(new { Message = "لا يوجد مستخدم لديه دور العميد." }); }
                     normalLeave.General_ManagerID = Dean.Id;
                     normalLeave.Direct_ManagerID = Dean.Id;
                 }
@@ -618,7 +982,7 @@ namespace Agazaty.Controllers
                 {
                     var res = await _accountService.GetAllUsersInRole("أمين الكلية");
                     var Supervisor = res.FirstOrDefault();
-                    if (Supervisor == null) { return BadRequest(new { Message = "There no user with the Supervisor role" }); }
+                    if (Supervisor == null) { return BadRequest(new { Message = "لا يوجد مستخدم لديه دور أمين كلية." }); }
                     normalLeave.General_ManagerID = Supervisor.Id;
                     normalLeave.Direct_ManagerID = Supervisor.Id;
                 }
@@ -637,21 +1001,21 @@ namespace Agazaty.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة الطلب.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
-        [HttpPut("UpdateNormalLeave/{leaveID:int}")]
-        public async Task<IActionResult> UpdateNormalLeave(int leaveID, [FromBody] UpdateNormalLeaveDTO model) // قطع الاجازة
+        //[Authorize(Roles = "مدير الموارد البشرية")]
+        [HttpPut("UpdateNormalLeave/{leaveID:guid}")]
+        public async Task<IActionResult> UpdateNormalLeave(Guid leaveID, [FromBody] UpdateNormalLeaveDTO model) // قطع الاجازة
         {
-            if (leaveID <= 0)
-                return BadRequest(new { message = "Invalid leave ID." });
+            if (leaveID == Guid.Empty)
+                return BadRequest(new { message = "معرّف الإجازة غير صالح." });
 
             try
             {
                 if (model == null)
                 {
-                    return BadRequest(new { message = "Invalid request data." });
+                    return BadRequest(new { message = "بيانات الطلب غير صالحة." });
                 }
                 if (!ModelState.IsValid)
                 {
@@ -666,16 +1030,16 @@ namespace Agazaty.Controllers
 
                 if (NormalLeave == null)
                 {
-                    return NotFound(new { message = "Normal Leave not found or not eligible for update" });
+                    return NotFound(new { message = "لم يتم العثور على الإجازة الإعتيادية أو أنها غير قابلة للتحديث." });
                 }
                 DateTime today = DateTime.Today;
                 var errors = new List<string>();
 
-                if (model.EndDate < today)
-                    errors.Add("End date cannot be in the past.");
+                //if (model.EndDate < today)
+                //    errors.Add("تاريخ النهاية لا يمكن أن يكون في الماضي.");
 
                 if (NormalLeave.StartDate > model.EndDate)
-                    errors.Add("Start date cannot be after the new end date.");
+                    errors.Add("تاريخ النهاية لا يمكن ان يكون قبل تاريخ النهاية.");
 
                 if (errors.Any())
                     return BadRequest(new { messages = errors });
@@ -685,10 +1049,9 @@ namespace Agazaty.Controllers
                 NormalLeave.NotesFromEmployee = model.NotesFromEmployee;
                 //user.NormalLeavesCount += (int)((NormalLeave.EndDate - model.EndDate).TotalDays + 1);
 
-
-                int returnedDays = (int)((NormalLeave.EndDate - model.EndDate).TotalDays + 1);
+                int returnedDays = await _leaveValidationService.CalculateLeaveDays(model.EndDate, NormalLeave.EndDate);
                 NormalLeave.EndDate = model.EndDate;
-
+                NormalLeave.Days = await _leaveValidationService.CalculateLeaveDays(NormalLeave.StartDate, NormalLeave.EndDate);
                 if (user.Counts == CountsFromNormalLeaveTypes.FromNormalLeave)
                 {
                     user.NormalLeavesCount += returnedDays;
@@ -710,7 +1073,6 @@ namespace Agazaty.Controllers
                     user.NormalLeavesCount += returnedDays;
                     returnedDays = 0;
                 }
-
                 else if (user.Counts == CountsFromNormalLeaveTypes.From81Before2Years)
                 {
                     if (returnedDays >= user.TakenNormalLeavesCount_81Before2Years)
@@ -832,28 +1194,28 @@ namespace Agazaty.Controllers
 
                 return Ok(new
                 {
-                    message = "Normal Leave updated successfully",
+                    message = "تم تحديث الإجازة الإعتيادية بنجاح.",
                     Leave = leave
                 });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء التحديث.", error = ex.Message });
             }
 
         }
         [Authorize(Roles = "عميد الكلية,أمين الكلية")]
-        [HttpPut("UpdateGeneralManagerDecision/{leaveID:int}")]
-        public async Task<IActionResult> UpdateGeneralManagerDecision(int leaveID, [FromBody] GeneralManagerDecisionDTO model)
+        [HttpPut("UpdateGeneralManagerDecision/{leaveID:guid}")]
+        public async Task<IActionResult> UpdateGeneralManagerDecision(Guid leaveID, [FromBody] GeneralManagerDecisionDTO model)
         {
-            if (leaveID <= 0)
-                return BadRequest(new { message = "Invalid leave ID." });
+            if (leaveID == Guid.Empty)
+                return BadRequest(new { message = "معرّف الإجازة غير صالح." });
 
             try
             {
                 if (model == null)
                 {
-                    return BadRequest(new { message = "Invalid request data." });
+                    return BadRequest(new { message = "بيانات الطلب غير صالحة." });
                 }
                 if (!ModelState.IsValid)
                 {
@@ -869,19 +1231,22 @@ namespace Agazaty.Controllers
 
                 if (NormalLeave == null)
                 {
-                    return NotFound(new { message = "Normal Leave not found or not eligible for update" });
+                    return NotFound(new { message = "لم يتم العثور على إجازة إعتيادية أو أنها غير قابلة للتحديث." });
                 }
                 var user = await _accountService.FindById(NormalLeave.UserID);
                 // Update properties
                 NormalLeave.GeneralManager_Decision = model.GeneralManagerDecision;
                 NormalLeave.ResponseDone = true;
+
                 if (model.GeneralManagerDecision == true)
                 {
+                    //int LeaveDays=await _leaveValidationService.CalculateLeaveDays(NormalLeave.StartDate, NormalLeave.EndDate);
+                    int LeaveDays = NormalLeave.Days;
                     NormalLeave.Accepted = true;
-                    if (((NormalLeave.EndDate - NormalLeave.StartDate).TotalDays + 1) > user.NormalLeavesCount)
-                    {                       
+                    if (LeaveDays > user.NormalLeavesCount)
+                    {
                         user.TakenNormalLeavesCount += user.NormalLeavesCount;
-                        int DifferenceDays = (int)(NormalLeave.EndDate - NormalLeave.StartDate).TotalDays + 1 - user.NormalLeavesCount;
+                        int DifferenceDays = LeaveDays - user.NormalLeavesCount;
                         user.NormalLeavesCount = 0;
                         user.HowManyDaysFrom81And47 += DifferenceDays;
                         if (DifferenceDays > user.NormalLeavesCount_81Before3Years)
@@ -926,7 +1291,7 @@ namespace Agazaty.Controllers
                             DifferenceDays = 0;
                         }
 
-                        if (DifferenceDays > 0) 
+                        if (DifferenceDays > 0)
                         {
                             user.TakenNormalLeavesCount_47 += DifferenceDays;
                             user.NormalLeavesCount_47 -= DifferenceDays;
@@ -935,20 +1300,82 @@ namespace Agazaty.Controllers
                     }
                     else
                     {
-                        user.TakenNormalLeavesCount += (int)((NormalLeave.EndDate - NormalLeave.StartDate).TotalDays + 1);
+                        user.TakenNormalLeavesCount += LeaveDays;
                         user.NormalLeavesCount -= user.TakenNormalLeavesCount;
                         user.Counts = CountsFromNormalLeaveTypes.FromNormalLeave;
                     }
 
-
                     NormalLeave.LeaveStatus = LeaveStatus.Accepted;
                     NormalLeave.Holder = Holder.NotWaiting;
+                    var UserNameForEmail = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
 
-
+                    var UserGender = (user.Gender == "ذكر") ? "عزيزي" : "عزيزتي";
                     var emailrequest = new EmailRequest
                     {
                         Email = user.Email,
-                        Subject = "تم قبول اجازتك الاعتيادية المطلوبة"
+                        Subject = "تم قبول إجازتك الإعتيادية المطلوبة.",
+                        Body = $@"
+                            <!DOCTYPE html>
+                            <html lang='ar'>
+                            <head>
+                              <meta charset='UTF-8'>
+                              <style>
+                                body {{
+                                  font-family: 'Tahoma', sans-serif;
+                                  direction: rtl;
+                                  unicode-bidi: plaintext;
+                                  background-color: #f9f9f9;
+                                  padding: 20px;
+                                }}
+                                .container {{
+                                  max-width: 600px;
+                                  margin: auto;
+                                  background-color: #ffffff;
+                                  border: 1px solid #00ff00;
+                                  border-radius: 8px;
+                                  padding: 30px;
+                                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+                                  text-align: right;
+                                }}
+                                h2 {{
+                                  color: #00b300;
+                                  text-align: center;
+                                }}
+                                p {{
+                                  font-size: 16px;
+                                  color: #333333;
+                                  line-height: 1.6;
+                                }}
+                                .footer {{
+                                  margin-top: 30px;
+                                  text-align: center;
+                                  font-size: 14px;
+                                  color: #777777;
+                                }}
+                                .highlight {{
+                                  color: #27ae60;
+                                  font-weight: bold;
+                                }}
+                              </style>
+                            </head>
+                            <body>
+                              <div class='container'>
+                                <h2>إشعار بقبول إجازتك الاعتيادية المطلوبة</h2>
+                                  <p>{UserGender}: {UserNameForEmail}</p>
+                                <p>
+                                  عدد أيام الإجازة: <span class='highlight'>{ToArabicDigits(NormalLeave.Days.ToString())}</span><br />
+                                  تاريخ البداية: <span class='highlight'>{ToArabicDigits(NormalLeave.StartDate.ToString("dd/MM/yyyy", new CultureInfo("ar-EG")))}</span><br />
+                                  تاريخ النهاية: <span class='highlight'>{ToArabicDigits(NormalLeave.EndDate.ToString("dd/MM/yyyy", new CultureInfo("ar-EG")))}</span>
+                                </p>
+                                <p>لأي استفسار، يرجى التواصل معنا على الرقم: <strong>٠١١٢٧٤٧١١٨٨</strong></p>
+                                <div class='footer'>
+                                  مع تحياتنا<br />
+                                  فريق دعم إجازاتي
+                                </div>
+                              </div>
+                            </body>
+                            </html>"
+
                     };
                     await _EmailService.SendEmail(emailrequest);
                 }
@@ -959,12 +1386,81 @@ namespace Agazaty.Controllers
                     NormalLeave.RejectedBy = RejectedBy.GeneralManager;
                     NormalLeave.Holder = Holder.NotWaiting;
 
+                    var generalManagername = await _accountService.FindById(NormalLeave.General_ManagerID);
+                    var GeneralManagerNameForEmail = $"{generalManagername.FirstName} {generalManagername.SecondName} {generalManagername.ThirdName} {generalManagername.ForthName}";
 
+                    NormalLeave.Holder = Holder.NotWaiting;
+                    var UserNameForEmail = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
 
+                    var UserGender = (user.Gender == "ذكر") ? "عزيزي" : "عزيزتي";
                     var emailrequest = new EmailRequest
                     {
                         Email = user.Email,
-                        Subject = "تم رفض اجازتك الاعتيادية المطلوبة"
+                        Subject = "تم رفض إجازتك الإعتيادية المطلوبة.",
+                        Body = $@"
+                            <!DOCTYPE html>
+                            <html lang='ar'>
+                            <head>
+                              <meta charset='UTF-8'>
+                              <style>
+                                body {{
+                                  font-family: 'Tahoma', sans-serif;
+                                  direction: rtl;
+                                  unicode-bidi: plaintext;
+                                  background-color: #f9f9f9;
+                                  padding: 20px;
+                                }}
+                                .container {{
+                                  max-width: 600px;
+                                  margin: auto;
+                                  background-color: #ffffff;
+                                  border: 1px solid #ff0000;
+                                  border-radius: 8px;
+                                  padding: 30px;
+                                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+                                  text-align: right;
+                                }}
+                                h2 {{
+                                  color: #ff0000;
+                                  text-align: center;
+                                }}
+                                p {{
+                                  font-size: 16px;
+                                  color: #333333;
+                                  line-height: 1.6;
+                                }}
+                                .footer {{
+                                  margin-top: 30px;
+                                  text-align: center;
+                                  font-size: 14px;
+                                  color: #777777;
+                                }}
+                                .highlight {{
+                                  color: #e74c3c;
+                                  font-weight: bold;
+                                }}
+                              </style>
+                            </head>
+                            <body>
+                              <div class='container'>
+                                <h2>إشعار برفض إجازتك الاعتيادية المطلوبة</h2>
+                                <p>{UserGender}: {UserNameForEmail}</p>
+                                <p>
+                                 نأسف لإبلاغك بأنه قد تم رفض طلب الإجازة الخاص بك بواسطة المدير المختص :
+                                  <span class='highlight'>{GeneralManagerNameForEmail}</span><br />
+                                  عدد أيام الإجازة: <span class='highlight'>{ToArabicDigits(NormalLeave.Days.ToString())}</span><br />
+                                  تاريخ البداية: <span class='highlight'>{ToArabicDigits(NormalLeave.StartDate.ToString("dd/MM/yyyy", new CultureInfo("ar-EG")))}</span><br />
+                                  تاريخ النهاية: <span class='highlight'>{ToArabicDigits(NormalLeave.EndDate.ToString("dd/MM/yyyy", new CultureInfo("ar-EG")))}</span><br />
+                                  سبب الرفض: <span class='highlight'>{NormalLeave.DisapproveReasonOfGeneral_Manager}</span>
+                                </p>
+                                <p>لأي استفسار، يرجى التواصل معنا على الرقم: <strong>٠١١٢٧٤٧١١٨٨</strong></p>
+                                <div class='footer'>
+                                  مع تحياتنا<br />
+                                  فريق دعم إجازاتي
+                                </div>
+                              </div>
+                            </body>
+                            </html>"
                     };
                     await _EmailService.SendEmail(emailrequest);
                 }
@@ -973,7 +1469,7 @@ namespace Agazaty.Controllers
 
                 var leave = _mapper.Map<NormalLeaveDTO>(NormalLeave);
                 var coworker = await _accountService.FindById(NormalLeave.Coworker_ID);
-                var generalManager = await _accountService.FindById(NormalLeave.General_ManagerID); ;
+                var generalManager = await _accountService.FindById(NormalLeave.General_ManagerID);
                 var directManager = await _accountService.FindById(NormalLeave.Direct_ManagerID);
                 leave.GeneralManagerName = $"{generalManager.FirstName} {generalManager.SecondName} {generalManager.ThirdName} {generalManager.ForthName}";
                 leave.DirectManagerName = $"{directManager.FirstName} {directManager.SecondName} {directManager.ThirdName} {directManager.ForthName}";
@@ -982,21 +1478,21 @@ namespace Agazaty.Controllers
 
                 return Ok(new
                 {
-                    message = "General manager decision updated successfully",
+                    message = "تم تحديث قرار المدير المختص بنجاح.",
                     Leave = leave
                 });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء التحديث.", error = ex.Message });
             }
         }
         [Authorize]
-        [HttpPut(("UpdateDirectManagerDecision/{leaveID:int}"))]
-        public async Task<IActionResult> UpdateDirectManagerDecision(int leaveID, [FromBody] DirectManagerDecisionDTO model)
+        [HttpPut(("UpdateDirectManagerDecision/{leaveID:guid}"))]
+        public async Task<IActionResult> UpdateDirectManagerDecision(Guid leaveID, [FromBody] DirectManagerDecisionDTO model)
         {
-            if (leaveID <= 0)
-                return BadRequest(new { message = "Invalid leave ID." });
+            if (leaveID == Guid.Empty)
+                return BadRequest(new { message = "معرّف الإجازة غير صالح." });
 
             try
             {
@@ -1015,7 +1511,7 @@ namespace Agazaty.Controllers
 
                 if (NormalLeave == null)
                 {
-                    return NotFound(new { message = "Normal Leave not found or not eligible for update" });
+                    return NotFound(new { message = "لم يتم العثور على إجازة إعتيادية أو أنها غير قابلة للتحديث." });
                 }
 
                 var user = await _accountService.FindById(NormalLeave.UserID);
@@ -1029,10 +1525,79 @@ namespace Agazaty.Controllers
                     NormalLeave.Holder = Holder.NotWaiting;
                     NormalLeave.RejectedBy = RejectedBy.DirectManager;
 
+                    var directManagername = await _accountService.FindById(NormalLeave.Direct_ManagerID);
+                    var DirectManagerNameForEmail = $"{directManagername.FirstName} {directManagername.SecondName} {directManagername.ThirdName} {directManagername.ForthName}";
+                    var UserNameForEmail = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+
+                    var UserGender = (user.Gender == "ذكر") ? "عزيزي" : "عزيزتي";
                     var emailrequest = new EmailRequest
                     {
                         Email = user.Email,
-                        Subject = "تم رفض اجازتك الاعتيادية المطلوبة"
+                        Subject = "تم رفض إجازتك الإعتيادية المطلوبة.",
+                        Body = $@"
+                            <!DOCTYPE html>
+                            <html lang='ar'>
+                            <head>
+                              <meta charset='UTF-8'>
+                              <style>
+                                body {{
+                                  font-family: 'Tahoma', sans-serif;
+                                  direction: rtl;
+                                  unicode-bidi: plaintext;
+                                  background-color: #f9f9f9;
+                                  padding: 20px;
+                                }}
+                                .container {{
+                                  max-width: 600px;
+                                  margin: auto;
+                                  background-color: #ffffff;
+                                  border: 1px solid #ff0000;
+                                  border-radius: 8px;
+                                  padding: 30px;
+                                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+                                  text-align: right;
+                                }}
+                                h2 {{
+                                  color: #ff0000;
+                                  text-align: center;
+                                }}
+                                p {{
+                                  font-size: 16px;
+                                  color: #333333;
+                                  line-height: 1.6;
+                                }}
+                                .footer {{
+                                  margin-top: 30px;
+                                  text-align: center;
+                                  font-size: 14px;
+                                  color: #777777;
+                                }}
+                                .highlight {{
+                                  color: #e74c3c;
+                                  font-weight: bold;
+                                }}
+                              </style>
+                            </head>
+                            <body>
+                              <div class='container'>
+                                <h2>إشعار برفض إجازتك الاعتيادية المطلوبة</h2>
+                                <p>{UserGender}: {UserNameForEmail}</p>
+                                <p>
+                                 نأسف لإبلاغك بأنه قد تم رفض طلب الإجازة الخاص بك بواسطة المدير المباشر :
+                                  <span class='highlight'>{DirectManagerNameForEmail}</span><br />
+                                  عدد أيام الإجازة: <span class='highlight'>{ToArabicDigits(NormalLeave.Days.ToString())}</span><br />
+                                  تاريخ البداية: <span class='highlight'>{ToArabicDigits(NormalLeave.StartDate.ToString("dd/MM/yyyy", new CultureInfo("ar-EG")))}</span><br />
+                                  تاريخ النهاية: <span class='highlight'>{ToArabicDigits(NormalLeave.EndDate.ToString("dd/MM/yyyy", new CultureInfo("ar-EG")))}</span><br />
+                                  سبب الرفض: <span class='highlight'>{NormalLeave.DisapproveReasonOfDirect_Manager}</span>
+                                </p>
+                                <p>لأي استفسار، يرجى التواصل معنا على الرقم: <strong>٠١١٢٧٤٧١١٨٨</strong></p>
+                                <div class='footer'>
+                                  مع تحياتنا<br />
+                                  فريق دعم إجازاتي
+                                </div>
+                              </div>
+                            </body>
+                            </html>"
                     };
                     await _EmailService.SendEmail(emailrequest);
                 }
@@ -1055,21 +1620,21 @@ namespace Agazaty.Controllers
 
                 return Ok(new
                 {
-                    message = "Direct Manager decision updated successfully.",
+                    message = "تم تحديث قرار المدير المباشر بنجاح.",
                     Leave = leave
                 });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء التحديث.", error = ex.Message });
             }
         }
         [Authorize]
-        [HttpPut("UpdateCoworkerDecision/{leaveID:int}")]
-        public async Task<IActionResult> UpdateCoworkerDecision([FromRoute] int leaveID, [FromQuery] bool CoworkerDecision)
+        [HttpPut("UpdateCoworkerDecision/{leaveID:guid}")]
+        public async Task<IActionResult> UpdateCoworkerDecision([FromRoute] Guid leaveID, [FromQuery] bool CoworkerDecision)
         {
-            if (leaveID <= 0)
-                return BadRequest(new { message = "Invalid leave ID." });
+            if (leaveID == Guid.Empty)
+                return BadRequest(new { message = "معرّف الإجازة غير صالح." });
 
             try
             {
@@ -1082,7 +1647,7 @@ namespace Agazaty.Controllers
 
                 if (NormalLeave == null)
                 {
-                    return NotFound(new { message = "Normal Leave not found or not eligible for update" });
+                    return NotFound(new { message = "لم يتم العثور على إجازة إعتيادية أو أنها غير قابلة للتحديث." });
                 }
 
                 var user = await _accountService.FindById(NormalLeave.UserID);
@@ -1095,11 +1660,78 @@ namespace Agazaty.Controllers
                     NormalLeave.Holder = Holder.NotWaiting;
                     NormalLeave.RejectedBy = RejectedBy.CoWorker;
 
+                    var CoworkerName = await _accountService.FindById(NormalLeave.Coworker_ID);
+                    var CoworkerNameNameForEmail = $"{CoworkerName.FirstName} {CoworkerName.SecondName} {CoworkerName.ThirdName} {CoworkerName.ForthName}";
+                    var UserNameForEmail = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
 
+                    var UserGender = (user.Gender == "ذكر") ? "عزيزي" : "عزيزتي";
                     var emailrequest = new EmailRequest
                     {
                         Email = user.Email,
-                        Subject = "تم رفض اجازتك الاعتيادية المطلوبة"
+                        Subject = "تم رفض إجازتك الإعتيادية المطلوبة.",
+                        Body = $@"
+                            <!DOCTYPE html>
+                            <html lang='ar'>
+                            <head>
+                              <meta charset='UTF-8'>
+                              <style>
+                                body {{
+                                  font-family: 'Tahoma', sans-serif;
+                                  direction: rtl;
+                                  unicode-bidi: plaintext;
+                                  background-color: #f9f9f9;
+                                  padding: 20px;
+                                }}
+                                .container {{
+                                  max-width: 600px;
+                                  margin: auto;
+                                  background-color: #ffffff;
+                                  border: 1px solid #ff0000;
+                                  border-radius: 8px;
+                                  padding: 30px;
+                                  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+                                  text-align: right;
+                                }}
+                                h2 {{
+                                  color: #ff0000;
+                                  text-align: center;
+                                }}
+                                p {{
+                                  font-size: 16px;
+                                  color: #333333;
+                                  line-height: 1.6;
+                                }}
+                                .footer {{
+                                  margin-top: 30px;
+                                  text-align: center;
+                                  font-size: 14px;
+                                  color: #777777;
+                                }}
+                                .highlight {{
+                                  color: #e74c3c;
+                                  font-weight: bold;
+                                }}
+                              </style>
+                            </head>
+                            <body>
+                              <div class='container'>
+                                <h2>إشعار برفض إجازتك الاعتيادية المطلوبة</h2>
+                                <p>{UserGender}: {UserNameForEmail}</p>
+                                <p>
+                                 نأسف لإبلاغك بأنه قد تم رفض طلب الإجازة الخاص بك بواسطة القائم بالعمل :
+                                  <span class='highlight'>{CoworkerNameNameForEmail}</span><br />
+                                  عدد أيام الإجازة: <span class='highlight'>{ToArabicDigits(NormalLeave.Days.ToString())}</span><br />
+                                  تاريخ البداية: <span class='highlight'>{ToArabicDigits(NormalLeave.StartDate.ToString("dd/MM/yyyy", new CultureInfo("ar-EG")))}</span><br />
+                                  تاريخ النهاية: <span class='highlight'>{ToArabicDigits(NormalLeave.EndDate.ToString("dd/MM/yyyy", new CultureInfo("ar-EG")))}</span><br />
+                                </p>
+                                <p>لأي استفسار، يرجى التواصل معنا على الرقم: <strong>٠١١٢٧٤٧١١٨٨</strong></p>
+                                <div class='footer'>
+                                  مع تحياتنا<br />
+                                  فريق دعم إجازاتي
+                                </div>
+                              </div>
+                            </body>
+                            </html>"
                     };
                     await _EmailService.SendEmail(emailrequest);
                 }
@@ -1107,24 +1739,22 @@ namespace Agazaty.Controllers
                 {
                     NormalLeave.Holder = Holder.DirectManager;
 
-
+                    // >>>>>>>>>>>>>>>>>>>>>>>>>>>  add this
+                    if (NormalLeave.Direct_ManagerID == NormalLeave.General_ManagerID)
+                    {
+                        NormalLeave.DirectManager_Decision = true;
+                        NormalLeave.Holder = Holder.GeneralManager;
+                    }
+                    // >>>>>>>>>>>>>>>>>>>>>>>>>>>
                     // if Head of Departement made a leave request
                     // if أمين الكلية made a leave request
-
-                    // >>>>>>>>>>>>>>>>>>>>>>>>>>>  add this
-                    if (NormalLeave.Direct_ManagerID == NormalLeave.General_ManagerID) NormalLeave.DirectManager_Decision = true;
-                    // >>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-
-                    var userr = await _accountService.FindById(NormalLeave.UserID);
-                    var IsdeptManager = await _departmentBase.Get(d => d.ManagerId == userr.Id);
-                    bool cheackRole = await _accountService.IsInRoleAsync(userr, "أمين الكلية");
-                    bool cheackRoleHr = await _accountService.IsInRoleAsync(userr, "مدير الموارد البشرية");
-                    if (cheackRole || IsdeptManager != null || cheackRoleHr)
-                        NormalLeave.DirectManager_Decision = true;
+                    //var userr = await _accountService.FindById(NormalLeave.UserID);
+                    //var IsdeptManager = await _departmentBase.Get(d => d.ManagerId == userr.Id);
+                    //bool cheackRole = await _accountService.IsInRoleAsync(userr, "أمين الكلية");
+                    //bool cheackRoleHr = await _accountService.IsInRoleAsync(userr, "مدير الموارد البشرية");
+                    //if (cheackRole || IsdeptManager != null || cheackRoleHr)
+                    //    NormalLeave.DirectManager_Decision = true;
                 }
-
-
                 await _base.Update(NormalLeave);
 
                 var leave = _mapper.Map<NormalLeaveDTO>(NormalLeave);
@@ -1138,42 +1768,42 @@ namespace Agazaty.Controllers
 
                 return Ok(new
                 {
-                    message = "Coworker decision updated successfully.",
+                    message = "تم تحديث قرار القائم بالعمل بنجاح.",
                     Leave = leave
                 });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while updating", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء التحديث.", error = ex.Message });
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
-        [HttpDelete("DeleteNormalLeave/{leaveID}")]
-        public async Task<IActionResult> DeleteNormalLeave([FromRoute] int leaveID)
+        [HttpDelete("DeleteNormalLeave/{leaveID:guid}")]
+        public async Task<IActionResult> DeleteNormalLeave([FromRoute] Guid leaveID)
         {
-            if (leaveID <= 0)
+            if (leaveID == Guid.Empty)
             {
-                return BadRequest("Wrong Leave ID.");
+                return BadRequest("معرّف الإجازة غير صحيح.");
             }
             try
             {
                 var NormalLeave = await _base.Get(n => n.ID == leaveID);
                 if (NormalLeave == null)
                 {
-                    return NotFound(new { message = "Normal Leave not found" });
+                    return NotFound(new { message = "لم يتم العثور على إجازة إعتيادية." });
                 }
                 await _base.Remove(NormalLeave);
 
                 return Ok(new
                 {
-                    message = "Normal Leave deleted successfully",
+                    message = "تم حذف الإجازة الإعتيادية بنجاح.",
                     leaveID = NormalLeave.ID,
                     userID = NormalLeave.UserID
                 });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while deleting", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء الحذف.", error = ex.Message });
             }
         }
     }

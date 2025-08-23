@@ -26,46 +26,46 @@ namespace Agazaty.Controllers
             _accountService = accountService;
             _normalLeavebase = normalLeavebase;
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        //[Authorize(Roles = "عميد الكلية,أمين الكلية,مدير الموارد البشرية,هيئة تدريس,موظف")]
+        [Authorize]
         [HttpGet("GetAllHolidays")]
         public async Task<IActionResult> GetAllHolidays()
         {
             try
             {
-                var holiday = await _base.Get(h => h.Date == Date);
-                if (holiday == null) leaveDays++;
-                var holidays = await _baseHoliday.GetAll(h => h.Date.Year == DateTime.UtcNow.Year);
+                var holidays = await _base.GetAll();
                 if (!holidays.Any())
                 {
-                    return NotFound("No holidays found.");
+                    return NotFound(new { Message = "لا توجد إجازات رسمية." });
                 }
                 return Ok(holidays);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
+
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
-        [HttpGet("GetHolidayById/{holidayID:int}")]
-        public async Task<IActionResult> GetHolidayById(int holidayID)
+        [HttpGet("GetHolidayById/{holidayID:guid}")]
+        public async Task<IActionResult> GetHolidayById(Guid holidayID)
         {
-            if (holidayID <= 0)
+            if (holidayID == Guid.Empty)
             {
-                return BadRequest(new { Message = "Invalid department Id" });
+                return BadRequest(new { Message = "معرف القسم غير صالح." });
             }
             try
             {
-                var holiday = await _base.Get(h=> h.Id == holidayID);
+                var holiday = await _base.Get(h => h.Id == holidayID);
                 if (holiday == null)
                 {
-                    return NotFound($"No department found.");
+                    return NotFound(new { Message = "لم يتم العثور على قسم." });
                 }
                 return Ok(holiday);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
@@ -76,44 +76,65 @@ namespace Agazaty.Controllers
             {
                 if (model == null)
                 {
-                    return BadRequest("Invalid holiday data.");
+                    return BadRequest(new { Message = "بيانات الإجازة غير صحيحة." });
+
                 }
                 if (!ModelState.IsValid)
                 {
                     return BadRequest(ModelState);
                 }
-                var holiday = await _base.Get(h => h.Date.Date == model.Date);
-                if (holiday != null)
+                var sameholiday = await _base.Get(h => h.Date.Date == model.Date.Date);
+                if (sameholiday != null)
                 {
-                    return NotFound(new { Message = "There is holiday already with this date." });
+                    return BadRequest(new { Message = "يوجد بالفعل عطلة في هذا التاريخ." });
+
                 }
-                var role = await _accountService.GetFirstRole(user);
+
                 var holiday = _mapper.Map<Holiday>(model);
                 await _base.Add(holiday);
-
-                var AllNormalLeaves = await _normalLeavebase.GetAll(l => l.StartDate.Year == holiday.Date.Year);
-                foreach(var leave in AllNormalLeaves)
+                //اخر تلت شهور
+                //var AllNormalLeaves = await _normalLeavebase.GetAll(l => l.StartDate.Year == holiday.Date.Year);
+                var threeMonthsAgo = holiday.Date.AddMonths(-3);
+                var AllNormalLeaves = await _normalLeavebase.GetAll(l => l.StartDate >= threeMonthsAgo);
+                foreach (var leave in AllNormalLeaves)
                 {
-                    if(leave.StartDate >= model.Date && leave.EndDate <= model.Date)
+                    if (leave.StartDate.Date <= model.Date.Date && leave.EndDate.Date >= model.Date.Date)
                     {
                         var user = await _accountService.FindById(leave.UserID);
                         user.NormalLeavesCount++;
+                        leave.Days--;
+                        await _normalLeavebase.Update(leave);
+                        await _accountService.Update(user);
                     }
                 }
+
                 return CreatedAtAction(nameof(GetHolidayById), new { holidayID = holiday.Id }, holiday);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
-        [HttpPut("UpdateHoliday/{holidayID:int}")]
-        public async Task<IActionResult> UpdateHoliday([FromRoute] int holidayID, [FromBody] UpdateHolidayDTO model)
+        [HttpPut("UpdateHoliday/{holidayID:guid}")]
+        public async Task<IActionResult> UpdateHoliday([FromRoute] Guid holidayID, [FromBody] UpdateHolidayDTO model)
         {
-            if (holidayID <= 0)
+            if (holidayID == Guid.Empty)
             {
-                return BadRequest("Invalid holiday data.");
+                return BadRequest(new { Message = "بيانات الإجازة غير صحيحة." });
+            }
+            var OldHoliday = await _base.Get(h => h.Id == holidayID);
+            if (OldHoliday.Date.Date == model.Date.Date)
+            {
+                _mapper.Map(model, OldHoliday);
+                await _base.Update(OldHoliday);
+                return Ok(new { Message = "تم تحديث العطلة بنجاح.", Holiday = OldHoliday });
+
+            }
+            var sameholiday = await _base.Get(h => h.Date.Date == model.Date.Date);
+            if (sameholiday != null)
+            {
+                return BadRequest(new { Message = "يوجد بالفعل عطلة في هذا التاريخ." });
             }
 
             try
@@ -125,47 +146,60 @@ namespace Agazaty.Controllers
                 var holiday = await _base.Get(d => d.Id == holidayID);
                 if (holiday == null)
                 {
-                    return NotFound(new { Message = "Holiday is not found." });
+                    return NotFound(new { Message = "لم يتم العثور على العطلة." });
+
                 }
                 else // old date wrong
                 {
-                    var AllNormalLeaves1 = await _normalLeavebase.GetAll(l => l.StartDate.Year == holiday.Date.Year);
-                    foreach (var leave in AllNormalLeaves1)
+                    //اخر تلت شهور
+                    //var AllNormalLeaves1 = await _normalLeavebase.GetAll(l => l.StartDate.Year == holiday.Date.Year);
+                    var threeMonthsAgo2 = holiday.Date.AddMonths(-3);
+                    var AllNormalLeaves = await _normalLeavebase.GetAll(l => l.StartDate >= threeMonthsAgo2);
+                    foreach (var leave in AllNormalLeaves)
                     {
-                        if (leave.StartDate >= holiday.Date && leave.EndDate <= holiday.Date)
+                        if (leave.StartDate.Date <= holiday.Date.Date && leave.EndDate.Date >= holiday.Date.Date)
                         {
                             var user = await _accountService.FindById(leave.UserID);
                             user.NormalLeavesCount--;
+                            leave.Days++;
+                            await _normalLeavebase.Update(leave);
+                            await _accountService.Update(user);
                         }
                     }
                 }
                 _mapper.Map(model, holiday);
                 await _base.Update(holiday);
 
-                var AllNormalLeaves = await _normalLeavebase.GetAll(l => l.StartDate.Year == holiday.Date.Year);  // new date
-                foreach (var leave in AllNormalLeaves)
+                //أخر تلت شهور
+                //var AllNormalLeaves = await _normalLeavebase.GetAll(l => l.StartDate.Year == holiday.Date.Year);  // new date
+                var threeMonthsAgo3 = model.Date.AddMonths(-3);
+                var AllNormalLeaves1 = await _normalLeavebase.GetAll(l => l.StartDate >= threeMonthsAgo3);
+                foreach (var leave in AllNormalLeaves1)
                 {
-                    if (leave.StartDate >= holiday.Date && leave.EndDate <= holiday.Date)
+                    if (leave.StartDate.Date <= model.Date.Date && leave.EndDate.Date >= model.Date.Date)
                     {
                         var user = await _accountService.FindById(leave.UserID);
                         user.NormalLeavesCount++;
+                        leave.Days--;
+                        await _normalLeavebase.Update(leave);
+                        await _accountService.Update(user);
                     }
                 }
+                return Ok(new { Message = "تم تحديث العطلة بنجاح.", Holiday = holiday });
 
-                return Ok(new { Message = $"Holiday has been successfully updated.", Holiday = holiday });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
-        [HttpDelete("DeleteHoliday/{holidayID:int}")]
-        public async Task<IActionResult> DeleteHoliday(int holidayID)
+        [HttpDelete("DeleteHoliday/{holidayID:guid}")]
+        public async Task<IActionResult> DeleteHoliday(Guid holidayID)
         {
-            if (holidayID <= 0)
+            if (holidayID == Guid.Empty)
             {
-                return BadRequest(new { Message = "Invalid holiday Id." });
+                return BadRequest(new { Message = "معرف العطلة غير صالح." });
             }
 
             try
@@ -174,24 +208,27 @@ namespace Agazaty.Controllers
 
                 if (holiday == null)
                 {
-                    return NotFound($"No holiday found.");
+                    return NotFound(new { Message = "لم يتم العثور على عطلات." });
                 }
                 await _base.Remove(holiday);
 
-                var AllNormalLeaves = await _normalLeavebase.GetAll(l => l.StartDate.Year == holiday.Date.Year);
+                //var AllNormalLeaves = await _normalLeavebase.GetAll(l => l.StartDate.Year == holiday.Date.Year);
+                var threeMonthsAgo3 = holiday.Date.AddMonths(-3);
+                var AllNormalLeaves = await _normalLeavebase.GetAll(l => l.StartDate >= threeMonthsAgo3);
                 foreach (var leave in AllNormalLeaves)
                 {
-                    if (leave.StartDate >= holiday.Date && leave.EndDate <= holiday.Date)
+                    if (leave.StartDate.Date <= holiday.Date.Date && leave.EndDate.Date >= holiday.Date.Date)
                     {
                         var user = await _accountService.FindById(leave.UserID);
                         user.NormalLeavesCount--;
                     }
                 }
-                return Ok($"Holiday has been successfully deleted.");
+                return Ok(new { Message = "تم حذف العطلة بنجاح." });
+
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
     }
