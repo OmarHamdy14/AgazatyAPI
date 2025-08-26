@@ -1,14 +1,18 @@
 ﻿using Agazaty.Data.Base;
 using Agazaty.Data.DTOs.DepartmentDTOs;
+using Agazaty.Data.DTOs.NormalLeaveDTOs;
 using Agazaty.Data.DTOs.PermitLeavesDTOs;
+using Agazaty.Data.Email;
 using Agazaty.Data.Services.Interfaces;
 using Agazaty.Models;
 using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using NormalLeaveTask.Models;
 using System;
 using System.Data;
+using System.Net.Http;
 
 namespace Agazaty.Controllers
 {
@@ -31,53 +35,55 @@ namespace Agazaty.Controllers
             _accountService = accountService;
         }
         [Authorize]
-        [HttpGet("GetPermitLeaveImageByleaveId/{leaveID:int}", Name = "GetPermitLeaveImageByleaveId")]
+        [HttpGet("GetPermitLeaveImageByleaveId/{leaveID:guid}", Name = "GetPermitLeaveImageByleaveId")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<PermitLeaveDTO>> GetPermitLeaveImageByleaveId(int leaveID)
+        public async Task<ActionResult<PermitLeaveDTO>> GetPermitLeaveImageByleaveId(Guid leaveID)
         {
-            if (leaveID <= 0)
-                return BadRequest(new { message = "Invalid leave ID." });
+            if (leaveID == Guid.Empty)
+                return BadRequest(new { message = "معرف التصريح غير صالح." });
             try
             {
                 var permitLeaveImage = await _PermitImagebase.Get(c => c.LeaveId == leaveID);
                 if (permitLeaveImage == null)
                 {
-                    return NotFound(new { Message = "No permit Leave image found." });
+                    return NotFound(new { Message = "لا توجد صورة للتصريح." });
                 }
                 return Ok(_mapper.Map<PermitLeaveImageDTO>(permitLeaveImage));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
         [Authorize]
-        [HttpGet("GetPermitLeaveById/{leaveID:int}", Name = "GetPermitLeave")]
+        [HttpGet("GetPermitLeaveById/{leaveID:guid}", Name = "GetPermitLeave")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<ActionResult<PermitLeaveDTO>> GetPermitLeaveById(int leaveID)
+        public async Task<ActionResult<PermitLeaveDTO>> GetPermitLeaveById(Guid leaveID)
         {
-            if (leaveID <= 0)
-                return BadRequest(new { message = "Invalid leave ID." });
+            if (leaveID == Guid.Empty)
+                return BadRequest(new { message = "معرف التصريح غير صالح." });
             try
             {
                 var permitLeave = await _Permitbase.Get(c => c.Id == leaveID);
                 if (permitLeave == null)
                 {
-                    return NotFound(new { Message = "No permit Leave found." });
+                    return NotFound(new { Message = "لم يتم العثور على تصريح." });
                 }
                 var leave = _mapper.Map<PermitLeaveDTO>(permitLeave);
                 var user = await _accountService.FindById(permitLeave.UserId);
                 leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                leave.FirstName = user.FirstName;
+                leave.SecondName = user.SecondName;
                 return Ok(leave);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
-        [Authorize(Roles = "مدير الموارد البشرية")]
+        //[Authorize(Roles = "مدير الموارد البشرية")]
         [HttpGet("GetAllPermitLeaves", Name = "GetAllPermitLeaves")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -88,20 +94,20 @@ namespace Agazaty.Controllers
                 var permitLeaves = await _Permitbase.GetAll();
                 if (!permitLeaves.Any())
                 {
-                    return NotFound(new { Message = "Ino permit leaves found." });
+                    return NotFound(new { Message = "لا توجد تصاريح لم يتم حصرها." });
                 }
 
                 var leaves = _mapper.Map<IEnumerable<PermitLeaveDTO>>(permitLeaves);
-                foreach(var leave in leaves)
+                foreach (var leave in leaves)
                 {
-                    var user = await _accountService.FindById(leave.UserId);
+                    var user = await _accountService.FindById(leave.UserID);
                     leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
                 }
                 return Ok(leaves);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
         [Authorize]
@@ -111,93 +117,94 @@ namespace Agazaty.Controllers
         public async Task<ActionResult<IEnumerable<PermitLeaveDTO>>> GetAllPermitLeavesByUserID(string userID)
         {
             if (string.IsNullOrWhiteSpace(userID))
-                return BadRequest(new { message = "Invalid user ID." });
+                return BadRequest(new { message = "معرّف المستخدم غير صالح." });
             try
             {
                 var permitLeaves = await _Permitbase.GetAll(p => p.UserId == userID);
                 if (!permitLeaves.Any())
                 {
-                    return NotFound(new { Message = "no permit leaves found" });
+                    return NotFound(new { Message = "لا توجد تصاريح." });
                 }
 
                 var leaves = _mapper.Map<IEnumerable<PermitLeaveDTO>>(permitLeaves);
                 foreach (var leave in leaves)
                 {
-                    var user = await _accountService.FindById(leave.UserId);
+                    var user = await _accountService.FindById(leave.UserID);
                     leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
                 }
                 return Ok(leaves);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
-        [Authorize]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpGet("GetAllPermitLeavesByUserIDAndMonth/{userID}/{month:int}", Name = "GetAllPermitLeavesByUserIDAndMonth")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<IEnumerable<PermitLeaveDTO>>> GetAllPermitLeavesByUserIDAndMonth(string userID, int month)
         {
             if (string.IsNullOrWhiteSpace(userID) || month < 1 || month > 12)
-                return BadRequest(new { message = "Invalid user ID or month." });
+                return BadRequest(new { message = "معرف المستخدم أو الشهر غير صحيح." });
             try
             {
                 var permitLeaves = await _Permitbase.GetAll(p => p.UserId == userID &&
                                    p.Date.Month == month);
                 if (!permitLeaves.Any())
                 {
-                    return NotFound(new { Message = "no permit leaves found." });
+                    return NotFound(new { Message = "لا توجد تصاريح." });
                 }
 
                 var leaves = _mapper.Map<IEnumerable<PermitLeaveDTO>>(permitLeaves);
                 foreach (var leave in leaves)
                 {
-                    var user = await _accountService.FindById(leave.UserId);
+                    var user = await _accountService.FindById(leave.UserID);
                     leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
                 }
                 return Ok(leaves);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
-        [Authorize]
+        [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpGet("GetAllPermitLeavesByUserIDAndYear/{userID}/{year:int}", Name = "GetAllPermitLeavesByUserIDAndYear")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult<IEnumerable<PermitLeaveDTO>>> GetAllPermitLeavesByUserIDAndYear(string userID, int year)
         {
             if (string.IsNullOrWhiteSpace(userID) || year < 1900)
-                return BadRequest(new { message = "Invalid user ID or year." });
+                return BadRequest(new { message = "معرف المستخدم أو السنة غير صحيحة." });
             try
             {
                 var permitLeaves = await _Permitbase.GetAll(p => p.UserId == userID &&
                                    p.Date.Year == year);
                 if (!permitLeaves.Any())
                 {
-                    return NotFound(new{ Message = "no permit leaves found."});
+                    return NotFound(new { Message = "لا توجد تصاريح." });
                 }
 
                 var leaves = _mapper.Map<IEnumerable<PermitLeaveDTO>>(permitLeaves);
                 foreach (var leave in leaves)
                 {
-                    var user = await _accountService.FindById(leave.UserId);
+                    var user = await _accountService.FindById(leave.UserID);
                     leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
                 }
                 return Ok(leaves);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
+        [Consumes("multipart/form-data")]
         [HttpPost("CreatePermitLeave", Name = "CreatePermitLeave")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult<PermitLeave>> CreatePermitLeave([FromForm] CreatePermitLeaveDTO model, [FromForm] List<IFormFile>? files)
+        public async Task<ActionResult<PermitLeave>> CreatePermitLeave([FromForm] CreatePermitLeaveDTO model, IFormFile? file)
         {
             try
             {
@@ -205,43 +212,46 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(ModelState);
                 }
-                
-                if (model.Hours <= 0) return BadRequest(new { Message = "Hours should be more than 0." });
-                if(await _accountService.FindById(model.UserId) is null) return BadRequest(new { Message = "User is not found." });
+                var PermitleavesOfUsers = await _Permitbase.GetAll(p => p.UserId == model.UserId);
+                if (PermitleavesOfUsers.Any(p => p.Date.Date == model.Date.Date))
+                {
+                    return BadRequest(new { Message = "الحد الاقصي تصريح واحد يوميا" });
+                }
+                if (model.Hours <= 0) return BadRequest(new { Message = "عدد الساعات يجب أن يكون أكثر من 0." });
+                if (model.Hours > 3) return BadRequest(new { Message = "عدد الساعات لا يمكن أن تكون أكثر من ثلاث ساعات." });
+
+                if (await _accountService.FindById(model.UserId) is null) return BadRequest(new { Message = "المستخدم غير موجود." });
 
                 var permitLeave = _mapper.Map<PermitLeave>(model);
-
+                permitLeave.Active = true;
                 string wwwRootPath = _webHostEnvironment.WebRootPath;
-                if (files != null)
+                if (file != null)
                 {
-                    foreach (var file in files)
+                    string fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
+                    string permitLeavePath = @"images\PermitLeaves\PermitLeaveUser-" + permitLeave.UserId;
+                    string finalPath = Path.Combine(wwwRootPath, permitLeavePath);
+
+                    if (!Directory.Exists(finalPath))
                     {
-                        string fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
-                        string permitLeavePath = @"images\PermitLeaves\PermitLeaveUser-" + permitLeave.UserId;
-                        string finalPath = Path.Combine(wwwRootPath, permitLeavePath);
-
-                        if (!Directory.Exists(finalPath))
-                        {
-                            Directory.CreateDirectory(finalPath);
-                        }
-                        using (var fileStream = new FileStream(Path.Combine(finalPath, fileName), FileMode.Create))
-                        {
-                            file.CopyTo(fileStream);
-                        }
-
-                        PermitLeaveImage permitLeaveImage = new PermitLeaveImage()
-                        {
-                            ImageUrl = @"\" + permitLeavePath + @"\" + fileName,
-                            LeaveId = permitLeave.Id
-                        };
-
-
-                        if (permitLeave.PermitLeaveImages == null)
-                        {
-                            permitLeave.PermitLeaveImages = new List<PermitLeaveImage>();
-                        }
-                        permitLeave.PermitLeaveImages.Add(permitLeaveImage);
+                        Directory.CreateDirectory(finalPath);
                     }
+                    using (var fileStream = new FileStream(Path.Combine(finalPath, fileName), FileMode.Create))
+                    {
+                        file.CopyTo(fileStream);
+                    }
+                    PermitLeaveImage permitLeaveImage = new PermitLeaveImage()
+                    {
+                        ImageUrl = @"\" + permitLeavePath + @"\" + fileName,
+                        LeaveId = permitLeave.Id
+                    };
+
+
+                    if (permitLeave.PermitLeaveImage == null)
+                    {
+                        permitLeave.PermitLeaveImage = new PermitLeaveImage();
+                    }
+                    permitLeave.PermitLeaveImage = permitLeaveImage;
+
                 }
                 await _Permitbase.Add(permitLeave);
 
@@ -252,19 +262,55 @@ namespace Agazaty.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
-        [HttpPut("UpdatePermitLeave/{leaveID:int}", Name = "UpdatePermitLeave")]
+        [Consumes("multipart/form-data")]
+        [HttpPut("SoftDeletePermitLeave/{leaveID:guid}")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> SoftDeletePermitLeave([FromRoute] Guid leaveID)
+        {
+            if (leaveID == Guid.Empty)
+                return BadRequest(new { message = "معرّف التصريح غير صالح." });
+
+            try
+            {
+                var PermitLeave = await _Permitbase.Get(n =>
+                    n.Id == leaveID);
+
+                //if (PermitLeave == null)
+                //{
+                //    return NotFound(new { message = "لم يتم العثور على تصريح أو أنه غير قابل للتحديث." });
+                //}
+
+                // Update properties
+                PermitLeave.Active = false;
+                await _Permitbase.Update(PermitLeave);
+
+                return Ok(new
+                {
+                    message = "تم الحذف بنجاح.",
+                    Leave = PermitLeave,
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "حدث خطأ أثناء الحذف.", error = ex.Message });
+            }
+        }
+        [Authorize(Roles = "مدير الموارد البشرية")]
+        [Consumes("multipart/form-data")]
+        [HttpPut("UpdatePermitLeave/{leaveID:guid}", Name = "UpdatePermitLeave")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> UpdatePermitLeave(int leaveID, [FromForm] UpdatePermitLeaveDTO model, [FromForm] List<IFormFile>? files) 
+        public async Task<IActionResult> UpdatePermitLeave(Guid leaveID, [FromForm] UpdatePermitLeaveDTO model, IFormFile? file)
         {
-            if (leaveID<=0)
+            if (leaveID == Guid.Empty)
             {
-                return BadRequest(new { Message = "Invalid leave Id." });
+                return BadRequest(new { Message = "معرف التصريح غير صالح." });
             }
             try
             {
@@ -272,79 +318,79 @@ namespace Agazaty.Controllers
                 {
                     return BadRequest(ModelState);
                 }
-                if (model.Hours <= 0) return BadRequest(new { Message = "Hours should be more than 0." });
-                if (await _accountService.FindById(model.UserId) is null) return BadRequest(new { Message = "User is not found." });
+                if (model.Hours <= 0) return BadRequest(new { Message = "عدد الساعات يجب أن يكون أكثر من 0." });
+                if (await _accountService.FindById(model.UserId) is null) return BadRequest(new { Message = "المستخدم غير موجود." });
 
 
                 var permitLeave = await _Permitbase.Get(c => c.Id == leaveID);
                 if (permitLeave == null)
                 {
-                    return NotFound(new { Message = "no permit leaves found." });
+                    return NotFound(new { Message = "لا توجد تصاريح." });
                 }
 
                 _mapper.Map(model, permitLeave);
 
                 string wwwRootPath = _webHostEnvironment.WebRootPath;
-                if (files != null)
+                if (file != null)
                 {
-                    foreach (var file in files)
+
+
+                    string fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
+                    string permitLeavePath = @"images\PermitLeaves\PermitLeaveUser-" + permitLeave.UserId;
+                    string finalPath = Path.Combine(wwwRootPath, permitLeavePath);
+
+                    if (!Directory.Exists(finalPath))
                     {
-                        string fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
-                        string permitLeavePath = @"images\PermitLeaves\PermitLeaveUser-" + permitLeave.UserId;
-                        string finalPath = Path.Combine(wwwRootPath, permitLeavePath);
-
-                        if (!Directory.Exists(finalPath))
-                        {
-                            Directory.CreateDirectory(finalPath);
-                        }
-                        using (var fileStream = new FileStream(Path.Combine(finalPath, fileName), FileMode.Create))
-                        {
-                            file.CopyTo(fileStream);
-                        }
-
-                        PermitLeaveImage permitLeaveImage = new PermitLeaveImage()
-                        {
-                            ImageUrl = @"\" + permitLeavePath + @"\" + fileName,
-                            LeaveId = permitLeave.Id
-                        };
-
-
-                        if (permitLeave.PermitLeaveImages == null)
-                        {
-                            permitLeave.PermitLeaveImages = new List<PermitLeaveImage>();
-                        }
-                        permitLeave.PermitLeaveImages.Add(permitLeaveImage);
+                        Directory.CreateDirectory(finalPath);
                     }
+                    using (var fileStream = new FileStream(Path.Combine(finalPath, fileName), FileMode.Create))
+                    {
+                        file.CopyTo(fileStream);
+                    }
+
+                    PermitLeaveImage permitLeaveImage = new PermitLeaveImage()
+                    {
+                        ImageUrl = @"\" + permitLeavePath + @"\" + fileName,
+                        LeaveId = permitLeave.Id
+                    };
+
+
+                    if (permitLeave.PermitLeaveImage == null)
+                    {
+                        permitLeave.PermitLeaveImage = new PermitLeaveImage();
+                    }
+                    permitLeave.PermitLeaveImage = permitLeaveImage;
+
                 }
                 await _Permitbase.Update(permitLeave);
 
                 var leave = _mapper.Map<PermitLeaveDTO>(permitLeave);
                 var user = await _accountService.FindById(permitLeave.UserId);
                 leave.UserName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
-                return Ok(new {Message="Update is succeeded",PermitLeave = leave });
+                return Ok(new { Message = "تم التحديث بنجاح.", PermitLeave = leave });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
-        [HttpDelete("DeletePermitLeave/{leaveID:int}", Name = "DeletePermitLeave")]
+        [HttpDelete("DeletePermitLeave/{leaveID:guid}", Name = "DeletePermitLeave")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> DeletePermitLeave(int leaveID)
+        public async Task<IActionResult> DeletePermitLeave(Guid leaveID)
         {
-            if (leaveID<=0)
+            if (leaveID == Guid.Empty)
             {
-                return BadRequest(new { Message = "Invalid leave Id" });
+                return BadRequest(new { Message = "معرف التصريح غير صحيح." });
             }
             try
             {
                 var permitLeave = await _Permitbase.Get(c => c.Id == leaveID);
                 if (permitLeave == null)
                 {
-                    return NotFound(new {Message = "No Permit Leave found"});
+                    return NotFound(new { Message = "لا يوجد تصريح." });
                 }
                 string permitLeavePath = @"images\Permitleaves\PermitLeaveUser-" + permitLeave.UserId;
                 string finalPath = Path.Combine(_webHostEnvironment.WebRootPath, permitLeavePath);
@@ -360,21 +406,21 @@ namespace Agazaty.Controllers
                 }
                 await _Permitbase.Remove(permitLeave);
 
-                return Ok(new { Message = "Deletion is succeeded." });
+                return Ok(new { Message = "تم الحذف بنجاح." });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
-        [HttpDelete("DeleteImage/{imageId:int}", Name = "DeleteImage")]
+        [HttpDelete("DeleteImage/{imageId:guid}", Name = "DeleteImage")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> DeleteImage(int imageId)
+        public async Task<IActionResult> DeleteImage(Guid imageId)
         {
-            if (imageId <= 0)
-                return BadRequest(new { Message = "Invalid image Id" });
+            if (imageId == Guid.Empty)
+                return BadRequest(new { Message = "معرف الصورة غير صالح." });
             try
             {
                 var imageToBeDeleted = await _PermitImagebase.Get(pi => pi.Id == imageId);
@@ -390,13 +436,13 @@ namespace Agazaty.Controllers
                     }
                     await _PermitImagebase.Remove(imageToBeDeleted);
 
-                    return Ok(new { Message = "Deletion is succeeded." });
+                    return Ok(new { Message = "تم الحذف بنجاح." });
                 }
-                return NotFound(new { Message = "no image found." });
+                return NotFound(new { Message = "لا توجد صورة." });
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
     }
