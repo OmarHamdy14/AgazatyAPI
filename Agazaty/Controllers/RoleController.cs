@@ -1,4 +1,6 @@
-﻿using Agazaty.Data.DTOs.DepartmentDTOs;
+﻿using Agazaty.Data.Base;
+using Agazaty.Data.DTOs.AccountDTOs;
+using Agazaty.Data.DTOs.DepartmentDTOs;
 using Agazaty.Data.DTOs.PermitLeavesDTOs;
 using Agazaty.Data.DTOs.RoleDTOs;
 using Agazaty.Data.Services.Interfaces;
@@ -19,27 +21,59 @@ namespace Agazaty.Controllers
         private readonly IRoleService _roleService;
         private readonly IAccountService _accountService;
         private readonly IMapper _mapper;
-        public RoleController(IRoleService roleService, IMapper mapper, IAccountService accountService)
+        private readonly IEntityBaseRepository<Department> _deptBase;
+
+        public RoleController(IRoleService roleService, IMapper mapper, IAccountService accountService, IEntityBaseRepository<Department> deptBase)
         {
             _roleService = roleService;
             _mapper = mapper;
             _accountService = accountService;
+            _deptBase = deptBase;
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpGet("GetRoleByID/{roleId}")]
-        public async Task<IActionResult> GetRoleByID([FromRoute]string roleId)
-        { 
+        public async Task<IActionResult> GetRoleByID([FromRoute] string roleId)
+        {
             if (string.IsNullOrWhiteSpace(roleId))
-                return BadRequest(new { message = "Invalid role ID." });
+                return BadRequest(new { message = "معرّف المنصب غير صالح." });
             try
             {
                 var role = await _roleService.FindById(roleId);
-                if(role==null) return NotFound(new {Message="No role with this id is found."});
+                if (role == null) return NotFound(new { Message = "لم يتم العثور على منصب بهذا المعرف." });
                 return Ok(_mapper.Map<RoleDTO>(role));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
+            }
+        }
+        [Authorize(Roles = "مدير الموارد البشرية")]
+        [HttpGet("GetAllUsersInRole/{RoleName}")]
+        public async Task<IActionResult> GetAllUsersInRoles(string RoleName)
+        {
+            if (!await _roleService.IsRoleExisted(RoleName))
+                return BadRequest(new { Message = "Invalid Role!" });
+            try
+            {
+                var users = await _accountService.GetAllUsersInRole(RoleName);
+                if (users.Count() == 0) return NotFound(new { Message = "لم يتم العثور على مستخدمين في هذا المنصب." });
+                var ReturnedUsers = _mapper.Map<IEnumerable<UserDTO>>(users);
+                foreach (var ReturnedUser in ReturnedUsers)
+                {
+                    var user = await _accountService.FindById(ReturnedUser.Id);
+                    ReturnedUser.FullName = $"{user.FirstName} {user.SecondName} {user.ThirdName} {user.ForthName}";
+                    ReturnedUser.RoleName = RoleName;
+                    if (user.Departement_ID != null)
+                    {
+                        var dpt = await _deptBase.Get(d => d.Id == user.Departement_ID);
+                        ReturnedUser.DepartmentName = dpt.Name;
+                    }
+                }
+                return Ok(ReturnedUsers);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
@@ -49,25 +83,25 @@ namespace Agazaty.Controllers
             try
             {
                 var roles = await _roleService.GetAllRoles();
-                if (roles.Count() == 0) return NotFound(new {Message = "no roles found"});
-                return Ok(_mapper.Map<IEnumerable<RoleDTO>>(roles)); 
+                if (roles.Count() == 0) return NotFound(new { Message = "لم يتم العثور على مناصب." });
+                return Ok(_mapper.Map<IEnumerable<RoleDTO>>(roles));
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPost("CreateRole")]
-        public async Task<IActionResult> CreateRole([FromBody]CreateRoleDTO CR)
+        public async Task<IActionResult> CreateRole([FromBody] CreateRoleDTO CR)
         {
             try
             {
                 if (ModelState.IsValid)
                 {
-                    if(await _roleService.IsRoleExisted(CR.Name) == true)
+                    if (await _roleService.IsRoleExisted(CR.Name) == true)
                     {
-                        return BadRequest(new {Message = "This role is already created"});
+                        return BadRequest(new { Message = "تم إنشاء هذا المنصب بالفعل." });
                     }
                     var res = await _roleService.CreateRole(CR);
                     if (res.Succeeded)
@@ -81,32 +115,32 @@ namespace Agazaty.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
         [HttpPut("UpdateRole/{roleid}")]
-        public async Task<IActionResult> UpdateRole([FromRoute]string roleid, [FromBody]UpdateRoleDTO UR)
+        public async Task<IActionResult> UpdateRole([FromRoute] string roleid, [FromBody] UpdateRoleDTO UR)
         {
             if (string.IsNullOrWhiteSpace(roleid))
-                return BadRequest(new { message = "Invalid role ID." });
+                return BadRequest(new { message = "معرّف المنصب غير صالح." });
             try
             {
                 if (ModelState.IsValid)
                 {
                     if (await _roleService.IsRoleExisted(UR.Name) == true)
                     {
-                        return BadRequest(new { Message = "This role is already created" });
+                        return BadRequest(new { Message = "تم إنشاء هذا المنصب بالفعل." });
                     }
                     var role = await _roleService.FindById(roleid);
-                    if (role == null) return NotFound(new { Message = "There is no role with this ID." });
+                    if (role == null) return NotFound(new { Message = "لا يوجد منصب بهذا المعرف." });
 
-                    _mapper.Map(UR,role);
+                    _mapper.Map(UR, role);
 
                     var res = await _roleService.UpdateRole(role);
                     if (res.Succeeded)
                     {
-                        return Ok(new { Message = "Update is succeeded.", Role = _mapper.Map<RoleDTO>(role) });
+                        return Ok(new { Message = "تم التحديث بنجاح.", Role = _mapper.Map<RoleDTO>(role) });
                     }
                     return BadRequest(res.Errors);
                 }
@@ -114,7 +148,7 @@ namespace Agazaty.Controllers
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
         [Authorize(Roles = "مدير الموارد البشرية")]
@@ -122,25 +156,25 @@ namespace Agazaty.Controllers
         public async Task<IActionResult> DeleteRole(string roleid)
         {
             if (string.IsNullOrWhiteSpace(roleid))
-                return BadRequest(new { message = "Invalid role ID." });
+                return BadRequest(new { message = "معرّف المنصب غير صالح." });
             try
             {
                 var role = await _roleService.FindById(roleid);
-                if (role == null) return NotFound(new { Message = "There is no role with this ID." });
+                if (role == null) return NotFound(new { Message = "لا يوجد منصب بهذا المعرف." });
 
                 var users = await _accountService.GetAllUsersInRole(roleid);
-                if(users.Any()) return BadRequest(new {Message = "There are users with this role, edit their role to another one so you can delete this role."});  
+                if (users.Any()) return BadRequest(new { Message = "هناك مستخدمون بهذا المنصب، قم بتعديل منصبهم إلى منصب آخر حتى تتمكن من حذف هذا المنصب." });
 
                 var res = await _roleService.DeleteRole(role);
                 if (res.Succeeded)
                 {
-                    return Ok(new { Message = "Deletion is succeeded." });
+                    return Ok(new { Message = "تم الحذف بنجاح." });
                 }
                 return BadRequest(res.Errors);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "An error occurred while processing your request.", error = ex.Message });
+                return StatusCode(500, new { message = "حدث خطأ أثناء معالجة طلبك.", error = ex.Message });
             }
         }
     }
