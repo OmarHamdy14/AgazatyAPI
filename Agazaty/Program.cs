@@ -10,6 +10,10 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Agazaty.Data.Email;
 using Agazaty.Data.Services.AutomaticInitializationService;
+using Agazaty.Data.Services;
+using System.Data;
+using System.Data.Common;
+using Microsoft.Data.SqlClient;
 
 namespace Agazaty
 {
@@ -39,10 +43,13 @@ namespace Agazaty
             builder.Services.AddScoped<IEntityBaseRepository<PermitLeave>, EntityBaseRepository<PermitLeave>>();
             builder.Services.AddScoped<IEntityBaseRepository<PermitLeaveImage>, EntityBaseRepository<PermitLeaveImage>>();
             builder.Services.AddScoped<IEntityBaseRepository<NormalLeave>, EntityBaseRepository<NormalLeave>>();
-            builder.Services.AddScoped<IEntityBaseRepository<Holiday>, EntityBaseRepository<Holiday>>();
             builder.Services.AddScoped<IAccountService, AccountService>();
             builder.Services.AddScoped<IRoleService, RoleService>();
             builder.Services.AddScoped<IEmailService, EmailService>();
+            builder.Services.AddScoped<ILeaveValidationService, LeaveValidationService>();
+            builder.Services.AddScoped<IEntityBaseRepository<Holiday>, EntityBaseRepository<Holiday>>();
+            builder.Services.AddTransient<IDbConnection>(sp =>
+              new SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
 
             builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 
@@ -83,17 +90,16 @@ namespace Agazaty
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowAll",
-                    policy =>
-                    {
-                        policy.AllowAnyOrigin()
-                              .AllowAnyMethod()
-                              .AllowAnyHeader();
-                    });
+                       builder => builder
+                               .AllowAnyOrigin()
+                               .AllowAnyMethod()
+                               .AllowAnyHeader());
             });
 
             builder.Services.AddAuthorization();
 
             builder.Services.AddControllers();
+
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
@@ -109,7 +115,11 @@ namespace Agazaty
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
+            // Serve static files if your API needs to serve any (e.g., documentation files)
+            app.UseStaticFiles();
 
+            // Enables routing in the app
+            app.UseRouting();
 
             app.UseAuthentication();
             app.UseAuthorization();
