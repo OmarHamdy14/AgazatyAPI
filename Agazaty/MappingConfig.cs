@@ -22,18 +22,15 @@ namespace Agazaty
 
             CreateMap<PermitLeaveImage, PermitLeaveImageDTO>().ReverseMap();
 
-            CreateMap<Holiday, CreateHolidayDTO>().ReverseMap();
-            CreateMap<Holiday, UpdateHolidayDTO>().ReverseMap();
-
             CreateMap<CasualLeave, CreateCasualLeaveDTO>().ReverseMap();
             CreateMap<CasualLeave, UpdateCasualLeaveDTO>().ReverseMap();
             CreateMap<CasualLeave, CasualLeaveDTO>().ReverseMap();
 
-            CreateMap<SickLeave, UpdateSickLeaveDTO>().ReverseMap(); 
+            CreateMap<SickLeave, UpdateSickLeaveDTO>().ReverseMap();
             CreateMap<SickLeave, CreateSickLeaveDTO>().ReverseMap();
             CreateMap<SickLeave, SickLeaveDTO>().ReverseMap();
 
-            CreateMap<NormalLeave, CreateNormalLeaveDTO>().ReverseMap(); 
+            CreateMap<NormalLeave, CreateNormalLeaveDTO>().ReverseMap();
             CreateMap<NormalLeave, UpdateNormalLeaveDTO>().ReverseMap();
             CreateMap<NormalLeave, NormalLeaveDTO>().ReverseMap();
 
@@ -49,6 +46,9 @@ namespace Agazaty
             CreateMap<IdentityRole, CreateRoleDTO>().ReverseMap();
             CreateMap<IdentityRole, UpdateRoleDTO>().ReverseMap();
             CreateMap<IdentityRole, RoleDTO>().ReverseMap();
+
+            CreateMap<Holiday, CreateHolidayDTO>().ReverseMap();
+            CreateMap<Holiday, UpdateHolidayDTO>().ReverseMap();
         }
     }
 }
